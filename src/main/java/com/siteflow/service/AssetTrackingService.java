@@ -53,14 +53,7 @@ public class AssetTrackingService {
      */
     @Transactional
     public ItemInstance checkoutItemInstance(String identifier, Long borrowRequestId) {
-        // Locate the physical tool by serial number or QR code
-        ItemInstance instance = itemInstanceMapper.findBySerialNumber(identifier);
-        if (instance == null) {
-            instance = itemInstanceMapper.findByQrCodeValue(identifier);
-        }
-        if (instance == null) {
-            throw new IllegalArgumentException("No tool found with identifier: " + identifier);
-        }
+        ItemInstance instance = resolveInstance(identifier);
 
         // A tool in any condition other than GOOD must not leave the warehouse
         if (instance.getToolCondition() != ToolCondition.GOOD) {
@@ -104,13 +97,7 @@ public class AssetTrackingService {
      */
     @Transactional
     public ItemInstance returnItemInstance(String identifier, ToolCondition returnedCondition) {
-        ItemInstance instance = itemInstanceMapper.findBySerialNumber(identifier);
-        if (instance == null) {
-            instance = itemInstanceMapper.findByQrCodeValue(identifier);
-        }
-        if (instance == null) {
-            throw new IllegalArgumentException("No tool found with identifier: " + identifier);
-        }
+        ItemInstance instance = resolveInstance(identifier);
 
         // Update tool_condition immediately based on the physical inspection.
         // GOOD  → no further action needed, tool is available for re-issue.
@@ -120,5 +107,21 @@ public class AssetTrackingService {
 
         // Return a fresh read so callers see the persisted condition
         return itemInstanceMapper.findById(instance.getId());
+    }
+
+    /**
+     * Resolves a physical tool by serial number or QR code — both checkout and return
+     * accept either identifier, so the fallback lookup is shared here instead of being
+     * duplicated in each method.
+     */
+    private ItemInstance resolveInstance(String identifier) {
+        ItemInstance instance = itemInstanceMapper.findBySerialNumber(identifier);
+        if (instance == null) {
+            instance = itemInstanceMapper.findByQrCodeValue(identifier);
+        }
+        if (instance == null) {
+            throw new IllegalArgumentException("No tool found with identifier: " + identifier);
+        }
+        return instance;
     }
 }

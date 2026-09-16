@@ -12,10 +12,12 @@ import lombok.Getter;
 public class UserPrincipal extends User {
 
     private final Long userId;
+    private final String roleName;
 
     public UserPrincipal(Long userId, String username, String passwordHash, String roleName) {
         super(username, passwordHash, authorities(roleName));
         this.userId = userId;
+        this.roleName = roleName;
     }
 
     private static List<GrantedAuthority> authorities(String roleName) {

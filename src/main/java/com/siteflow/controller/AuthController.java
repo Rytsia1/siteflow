@@ -1,6 +1,5 @@
 package com.siteflow.controller;
 
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,12 +20,7 @@ public class AuthController {
      */
     @GetMapping("/me")
     public ApiResponse<CurrentUserView> me(@AuthenticationPrincipal UserPrincipal principal) {
-        String role = principal.getAuthorities().stream()
-                .findFirst()
-                .map(GrantedAuthority::getAuthority)
-                .map(authority -> authority.replace("ROLE_", ""))
-                .orElse(null);
         return ApiResponse.success("Current user.",
-                new CurrentUserView(principal.getUserId(), principal.getUsername(), role));
+                new CurrentUserView(principal.getUserId(), principal.getUsername(), principal.getRoleName()));
     }
 }

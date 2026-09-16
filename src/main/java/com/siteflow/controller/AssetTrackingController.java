@@ -32,12 +32,8 @@ public class AssetTrackingController {
     @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
     public ApiResponse<ItemInstance> checkout(
             @RequestBody @Valid CheckoutAssetDto dto) {
-        String identifier = dto.getEffectiveIdentifier();
-        if (identifier == null || identifier.isBlank()) {
-            throw new IllegalArgumentException("Either serialNumber or qrCodeValue must be provided");
-        }
-
-        ItemInstance instance = assetTrackingService.checkoutItemInstance(identifier, dto.borrowRequestId());
+        ItemInstance instance = assetTrackingService.checkoutItemInstance(
+                dto.getEffectiveIdentifier(), dto.borrowRequestId());
         return ApiResponse.success("Asset checked out successfully.", instance);
     }
 
