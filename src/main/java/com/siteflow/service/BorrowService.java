@@ -10,6 +10,7 @@ import com.siteflow.domain.BorrowItem;
 import com.siteflow.domain.BorrowRequest;
 import com.siteflow.domain.ItemStock;
 import com.siteflow.domain.TransactionLog;
+import com.siteflow.domain.enums.ApprovalStatus;
 import com.siteflow.domain.enums.BorrowStatus;
 import com.siteflow.domain.enums.TransactionType;
 import com.siteflow.mapper.BorrowItemMapper;
@@ -59,6 +60,7 @@ public class BorrowService {
                 .locationId(locationId)
                 .requestDate(LocalDateTime.now())
                 .status(BorrowStatus.BORROWED)
+                .approvalStatus(ApprovalStatus.PENDING_APPROVAL)
                 .build();
         borrowRequestMapper.insert(borrowRequest);
 
