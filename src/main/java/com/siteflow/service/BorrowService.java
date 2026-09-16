@@ -17,6 +17,7 @@ import com.siteflow.mapper.BorrowItemMapper;
 import com.siteflow.mapper.BorrowRequestMapper;
 import com.siteflow.mapper.ItemStockMapper;
 import com.siteflow.mapper.TransactionLogMapper;
+import com.siteflow.web.ResourceNotFoundException;
 
 @Service
 public class BorrowService {
@@ -103,7 +104,7 @@ public class BorrowService {
     public void processReturn(Long borrowItemId, int qtyReturned, Long userId) {
         BorrowItem borrowItem = borrowItemMapper.findById(borrowItemId);
         if (borrowItem == null) {
-            throw new IllegalArgumentException("Borrow item not found: " + borrowItemId);
+            throw new ResourceNotFoundException("Borrow item not found: " + borrowItemId);
         }
         if (qtyReturned <= 0) {
             throw new IllegalArgumentException("Return quantity must be positive for borrow item " + borrowItemId);

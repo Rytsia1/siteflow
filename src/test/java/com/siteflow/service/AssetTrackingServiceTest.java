@@ -20,6 +20,7 @@ import com.siteflow.domain.enums.ApprovalStatus;
 import com.siteflow.domain.enums.ToolCondition;
 import com.siteflow.mapper.BorrowRequestMapper;
 import com.siteflow.mapper.ItemInstanceMapper;
+import com.siteflow.web.ResourceNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
 class AssetTrackingServiceTest {
@@ -96,13 +97,25 @@ class AssetTrackingServiceTest {
     }
 
     @Test
-    @DisplayName("checkoutItemInstance fails when no tool matches either identifier")
-    void checkout_unknownIdentifier_throwsIllegalArgument() {
+    @DisplayName("checkoutItemInstance fails with 404-mapped exception when no tool matches either identifier")
+    void checkout_unknownIdentifier_throwsResourceNotFound() {
         when(itemInstanceMapper.findBySerialNumber("MISSING")).thenReturn(null);
         when(itemInstanceMapper.findByQrCodeValue("MISSING")).thenReturn(null);
 
         assertThatThrownBy(() -> assetTrackingService.checkoutItemInstance("MISSING", 5L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("checkoutItemInstance fails with 404-mapped exception when the borrow request id doesn't exist")
+    void checkout_unknownBorrowRequest_throwsResourceNotFound() {
+        ItemInstance instance = ItemInstance.builder().id(1L).serialNumber("SN-1").toolCondition(ToolCondition.GOOD)
+                .build();
+        when(itemInstanceMapper.findBySerialNumber("SN-1")).thenReturn(instance);
+        when(borrowRequestMapper.findById(99L)).thenReturn(null);
+
+        assertThatThrownBy(() -> assetTrackingService.checkoutItemInstance("SN-1", 99L))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test

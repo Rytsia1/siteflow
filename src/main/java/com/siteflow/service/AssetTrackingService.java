@@ -9,6 +9,7 @@ import com.siteflow.domain.BorrowRequest;
 import com.siteflow.domain.enums.ToolCondition;
 import com.siteflow.mapper.BorrowRequestMapper;
 import com.siteflow.mapper.ItemInstanceMapper;
+import com.siteflow.web.ResourceNotFoundException;
 
 /**
  * Manages the lifecycle of individually-tracked physical tool instances.
@@ -65,7 +66,7 @@ public class AssetTrackingService {
         // Verify the borrow request exists and has been approved
         BorrowRequest borrowRequest = borrowRequestMapper.findById(borrowRequestId);
         if (borrowRequest == null) {
-            throw new IllegalArgumentException("Borrow request not found: " + borrowRequestId);
+            throw new ResourceNotFoundException("Borrow request not found: " + borrowRequestId);
         }
         if (borrowRequest.getApprovalStatus() != ApprovalStatus.APPROVED) {
             throw new IllegalStateException(
@@ -120,7 +121,7 @@ public class AssetTrackingService {
             instance = itemInstanceMapper.findByQrCodeValue(identifier);
         }
         if (instance == null) {
-            throw new IllegalArgumentException("No tool found with identifier: " + identifier);
+            throw new ResourceNotFoundException("No tool found with identifier: " + identifier);
         }
         return instance;
     }

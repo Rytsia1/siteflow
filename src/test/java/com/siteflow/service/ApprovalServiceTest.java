@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.siteflow.domain.BorrowRequest;
 import com.siteflow.domain.enums.ApprovalStatus;
 import com.siteflow.mapper.BorrowRequestMapper;
+import com.siteflow.web.ResourceNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
 class ApprovalServiceTest {
@@ -48,12 +49,12 @@ class ApprovalServiceTest {
     }
 
     @Test
-    @DisplayName("approveBorrowRequest fails for an unknown request id")
-    void approve_unknownRequest_throwsIllegalArgument() {
+    @DisplayName("approveBorrowRequest fails with 404-mapped exception for an unknown request id")
+    void approve_unknownRequest_throwsResourceNotFound() {
         when(borrowRequestMapper.findById(99L)).thenReturn(null);
 
         assertThatThrownBy(() -> approvalService.approveBorrowRequest(99L, 9L, "ok"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
 
         verify(borrowRequestMapper, never()).updateApproval(any(), any(), any(), any(), any());
     }

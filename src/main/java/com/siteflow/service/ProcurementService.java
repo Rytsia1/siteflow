@@ -15,6 +15,7 @@ import com.siteflow.domain.enums.PurchaseOrderStatus;
 import com.siteflow.mapper.MaterialRequestItemMapper;
 import com.siteflow.mapper.MaterialRequestMapper;
 import com.siteflow.mapper.PurchaseOrderMapper;
+import com.siteflow.web.ResourceNotFoundException;
 import com.siteflow.web.dto.MaterialRequestView;
 
 /**
@@ -234,7 +235,7 @@ public class ProcurementService {
     private MaterialRequest requireMrInStatus(Long mrId, MaterialRequestStatus expected) {
         MaterialRequest mr = materialRequestMapper.findById(mrId);
         if (mr == null) {
-            throw new IllegalArgumentException("Material request not found: " + mrId);
+            throw new ResourceNotFoundException("Material request not found: " + mrId);
         }
         if (mr.getStatus() != expected) {
             throw new IllegalStateException(

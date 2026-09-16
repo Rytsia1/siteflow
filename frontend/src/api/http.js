@@ -19,15 +19,16 @@ http.interceptors.response.use(
   (error) => {
     const status = error.response?.status
 
-    // A 401 comes from the Spring Security filter chain, before @RestControllerAdvice
-    // runs, so the body is not an ApiResponse envelope — never read .message here.
+    // 401 (missing/invalid credentials) is rejected by the Spring Security filter chain
+    // before @RestControllerAdvice runs, but ApiAuthenticationEntryPoint gives it the
+    // same ApiResponse envelope as every other error, so .message is safe to read here too.
     if (status === 401) {
       logout()
-      ElMessage.error('Invalid credentials or session expired.')
+      ElMessage.error(error.response.data?.message || 'Invalid credentials or session expired.')
       router.push('/login')
     } else if (status === 403) {
       ElMessage.error(error.response.data?.message || 'Access denied.')
-    } else if (status === 400 || status === 409) {
+    } else if (status >= 400 && status < 500) {
       ElMessage.error(error.response.data?.message || 'Request failed.')
     } else if (status >= 500) {
       ElMessage.error(error.response.data?.message || 'An unexpected server error occurred.')

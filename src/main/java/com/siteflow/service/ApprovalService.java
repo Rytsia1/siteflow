@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.siteflow.domain.BorrowRequest;
 import com.siteflow.domain.enums.ApprovalStatus;
 import com.siteflow.mapper.BorrowRequestMapper;
+import com.siteflow.web.ResourceNotFoundException;
 import com.siteflow.web.dto.BorrowRequestView;
 
 /**
@@ -114,7 +115,7 @@ public class ApprovalService {
     private BorrowRequest requirePendingRequest(Long requestId) {
         BorrowRequest request = borrowRequestMapper.findById(requestId);
         if (request == null) {
-            throw new IllegalArgumentException("Borrow request not found: " + requestId);
+            throw new ResourceNotFoundException("Borrow request not found: " + requestId);
         }
         if (request.getApprovalStatus() != ApprovalStatus.PENDING_APPROVAL) {
             throw new IllegalStateException(

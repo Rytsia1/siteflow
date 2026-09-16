@@ -10,6 +10,15 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+  mvc:
+    throw-exception-if-no-handler-found: true
+  web:
+    resources:
+      # This backend serves no static resources (the Vue SPA is built/served
+      # separately), so disabling the resource-handler fallback lets an unmapped
+      # API path reach GlobalExceptionHandler's NoHandlerFoundException handler
+      # instead of falling through to a generic 404.
+      add-mappings: false
 
 mybatis:
   configuration:

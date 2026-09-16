@@ -23,6 +23,7 @@ import com.siteflow.domain.enums.PurchaseOrderStatus;
 import com.siteflow.mapper.MaterialRequestItemMapper;
 import com.siteflow.mapper.MaterialRequestMapper;
 import com.siteflow.mapper.PurchaseOrderMapper;
+import com.siteflow.web.ResourceNotFoundException;
 import com.siteflow.service.ProcurementService.MrLineItem;
 
 @ExtendWith(MockitoExtension.class)
@@ -75,6 +76,17 @@ class ProcurementServiceTest {
 
         assertThat(po.getPoStatus()).isEqualTo(PurchaseOrderStatus.ISSUED);
         verify(purchaseOrderMapper).insert(any());
+    }
+
+    @Test
+    @DisplayName("generatePurchaseOrder fails with 404-mapped exception when the MR id doesn't exist")
+    void generatePo_unknownMr_throwsResourceNotFound() {
+        when(materialRequestMapper.findById(404L)).thenReturn(null);
+
+        assertThatThrownBy(() -> procurementService.generatePurchaseOrder(404L, "Acme", null))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(purchaseOrderMapper, never()).insert(any());
     }
 
     @Test

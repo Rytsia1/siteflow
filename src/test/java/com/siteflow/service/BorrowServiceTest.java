@@ -28,6 +28,7 @@ import com.siteflow.mapper.BorrowRequestMapper;
 import com.siteflow.mapper.ItemStockMapper;
 import com.siteflow.mapper.TransactionLogMapper;
 import com.siteflow.service.BorrowService.BorrowItemRequest;
+import com.siteflow.web.ResourceNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
 class BorrowServiceTest {
@@ -120,6 +121,18 @@ class BorrowServiceTest {
         borrowService.processReturn(1L, 2, 3L);
 
         verify(borrowRequestMapper).updateStatus(9L, BorrowStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("processReturn fails with 404-mapped exception when the borrow item id doesn't exist")
+    void processReturn_unknownBorrowItem_throwsResourceNotFound() {
+        when(borrowItemMapper.findById(404L)).thenReturn(null);
+
+        assertThatThrownBy(() -> borrowService.processReturn(404L, 1, 3L))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(itemStockMapper, never()).adjustQty(any(), anyInt());
+        verify(transactionLogMapper, never()).insert(any());
     }
 
     @Test
