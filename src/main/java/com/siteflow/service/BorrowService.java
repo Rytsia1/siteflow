@@ -36,6 +36,9 @@ public class BorrowService {
     public record BorrowItemRequest(Long itemId, int qty) {
     }
 
+    public record ReturnLine(Long borrowItemId, int qty) {
+    }
+
     /**
      * Creates a borrow request and allocates stock for each requested item in one transaction:
      * stock availability is checked up front, then each item is recorded, stock is decremented,
@@ -69,7 +72,10 @@ public class BorrowService {
             borrowItemMapper.insert(borrowItem);
 
             ItemStock stock = itemStockMapper.findByItemIdAndLocationId(request.itemId(), locationId);
-            itemStockMapper.adjustQty(stock.getId(), -request.qty());
+            if (itemStockMapper.adjustQty(stock.getId(), -request.qty()) == 0) {
+                throw new IllegalStateException(
+                        "Insufficient stock for item " + request.itemId() + " at location " + locationId);
+            }
 
             transactionLogMapper.insert(TransactionLog.builder()
                     .itemId(request.itemId())
@@ -125,5 +131,25 @@ public class BorrowService {
                 .allMatch(item -> item.getQtyReturned() != null && item.getQtyReturned().equals(item.getQtyBorrowed()));
         borrowRequestMapper.updateStatus(borrowRequest.getId(),
                 allReturned ? BorrowStatus.COMPLETED : BorrowStatus.PARTIAL_RETURN);
+    }
+
+    /**
+     * Processes every return line against a single borrow request in one transaction. Every
+     * line is verified to belong to the request before any of them are applied, so a bad line
+     * rejects the whole batch instead of leaving stock partially restored.
+     */
+    @Transactional
+    public void processReturnsForRequest(Long borrowRequestId, List<ReturnLine> lines, Long userId) {
+        for (ReturnLine line : lines) {
+            BorrowItem borrowItem = borrowItemMapper.findById(line.borrowItemId());
+            if (borrowItem == null || !borrowItem.getBorrowRequestId().equals(borrowRequestId)) {
+                throw new IllegalArgumentException(
+                        "Borrow item " + line.borrowItemId() + " does not belong to request " + borrowRequestId);
+            }
+        }
+
+        for (ReturnLine line : lines) {
+            processReturn(line.borrowItemId(), line.qty(), userId);
+        }
     }
 }
