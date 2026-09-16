@@ -52,17 +52,20 @@ public class AssetTrackingService {
      * @return the ItemInstance that was checked out
      */
     @Transactional
-    public ItemInstance checkoutItemInstance(String serialNumber, Long borrowRequestId) {
-        // Locate the physical tool by its serial number
-        ItemInstance instance = itemInstanceMapper.findBySerialNumber(serialNumber);
+    public ItemInstance checkoutItemInstance(String identifier, Long borrowRequestId) {
+        // Locate the physical tool by serial number or QR code
+        ItemInstance instance = itemInstanceMapper.findBySerialNumber(identifier);
         if (instance == null) {
-            throw new IllegalArgumentException("No tool found with serial number: " + serialNumber);
+            instance = itemInstanceMapper.findByQrCodeValue(identifier);
+        }
+        if (instance == null) {
+            throw new IllegalArgumentException("No tool found with identifier: " + identifier);
         }
 
         // A tool in any condition other than GOOD must not leave the warehouse
         if (instance.getToolCondition() != ToolCondition.GOOD) {
             throw new IllegalStateException(
-                    "Tool " + serialNumber + " cannot be checked out — current condition: "
+                    "Tool " + identifier + " cannot be checked out — current condition: "
                     + instance.getToolCondition());
         }
 
@@ -95,15 +98,18 @@ public class AssetTrackingService {
      * call for this serial number will be blocked until the condition is reset
      * to GOOD (e.g. after a repair is completed and the tool is re-inspected).
      *
-     * @param serialNumber      the serial number of the tool being returned
+     * @param identifier        the serial number or QR code of the tool being returned
      * @param returnedCondition the physical condition observed during return inspection
      * @return the updated ItemInstance reflecting the post-return condition
      */
     @Transactional
-    public ItemInstance returnItemInstance(String serialNumber, ToolCondition returnedCondition) {
-        ItemInstance instance = itemInstanceMapper.findBySerialNumber(serialNumber);
+    public ItemInstance returnItemInstance(String identifier, ToolCondition returnedCondition) {
+        ItemInstance instance = itemInstanceMapper.findBySerialNumber(identifier);
         if (instance == null) {
-            throw new IllegalArgumentException("No tool found with serial number: " + serialNumber);
+            instance = itemInstanceMapper.findByQrCodeValue(identifier);
+        }
+        if (instance == null) {
+            throw new IllegalArgumentException("No tool found with identifier: " + identifier);
         }
 
         // Update tool_condition immediately based on the physical inspection.

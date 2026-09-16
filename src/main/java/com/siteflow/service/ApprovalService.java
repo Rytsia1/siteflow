@@ -68,10 +68,6 @@ public class ApprovalService {
      */
     @Transactional
     public BorrowRequest rejectBorrowRequest(Long requestId, Long adminId, String note) {
-        if (note == null || note.isBlank()) {
-            throw new IllegalArgumentException("A rejection note is required for request " + requestId);
-        }
-
         BorrowRequest request = requirePendingRequest(requestId);
 
         // Transition: PENDING_APPROVAL → REJECTED
