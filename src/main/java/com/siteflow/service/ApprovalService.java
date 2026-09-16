@@ -46,13 +46,7 @@ public class ApprovalService {
      */
     @Transactional
     public BorrowRequest approveBorrowRequest(Long requestId, Long adminId, String note) {
-        BorrowRequest request = requirePendingRequest(requestId);
-
-        // Transition: PENDING_APPROVAL → APPROVED
-        borrowRequestMapper.updateApproval(requestId, ApprovalStatus.APPROVED, adminId, note);
-
-        // Return a fresh read so the caller sees the persisted state
-        return borrowRequestMapper.findById(requestId);
+        return transitionApproval(requestId, adminId, note, ApprovalStatus.APPROVED);
     }
 
     /**
@@ -60,8 +54,10 @@ public class ApprovalService {
      *
      * <p>Transition: PENDING_APPROVAL → REJECTED
      *
-     * <p>A rejection does not release any stock (stock was never decremented for a
-     * pending-approval request in V2 flow). The note should explain the reason so
+     * <p>Stock was already decremented when the request was created (borrowing happens
+     * up front; approval is a downstream sign-off), and rejection does not restore it —
+     * the physical items are still out and must come back through the normal return
+     * flow regardless of the approval outcome. The note should explain the reason so
      * the requester can amend and resubmit if appropriate.
      *
      * @param requestId the borrow request to reject
@@ -71,12 +67,7 @@ public class ApprovalService {
      */
     @Transactional
     public BorrowRequest rejectBorrowRequest(Long requestId, Long adminId, String note) {
-        BorrowRequest request = requirePendingRequest(requestId);
-
-        // Transition: PENDING_APPROVAL → REJECTED
-        borrowRequestMapper.updateApproval(requestId, ApprovalStatus.REJECTED, adminId, note);
-
-        return borrowRequestMapper.findById(requestId);
+        return transitionApproval(requestId, adminId, note, ApprovalStatus.REJECTED);
     }
 
     /**
@@ -91,6 +82,30 @@ public class ApprovalService {
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Shared PENDING_APPROVAL → {approved|rejected} transition used by both
+     * approveBorrowRequest and rejectBorrowRequest, since the only difference
+     * between the two is which target status is written.
+     *
+     * <p>The pre-check gives a precise "already actioned" message for the common
+     * case; the atomic conditional UPDATE (matched by affected-row count) is what
+     * actually prevents two concurrent decisions on the same request from both
+     * succeeding, in case the request changed between the check and the write.
+     */
+    private BorrowRequest transitionApproval(Long requestId, Long adminId, String note, ApprovalStatus newStatus) {
+        requirePendingRequest(requestId);
+
+        int updated = borrowRequestMapper.updateApproval(
+                requestId, ApprovalStatus.PENDING_APPROVAL, newStatus, adminId, note);
+        if (updated == 0) {
+            throw new IllegalStateException(
+                    "Borrow request " + requestId + " was already actioned by another request "
+                    + "and is no longer pending approval.");
+        }
+
+        return borrowRequestMapper.findById(requestId);
+    }
 
     /**
      * Loads the request and asserts it is still PENDING_APPROVAL.

@@ -33,9 +33,15 @@ public interface MaterialRequestMapper {
     @Select("SELECT * FROM material_requests WHERE status = #{status} ORDER BY request_date DESC")
     List<MaterialRequest> findByStatus(@Param("status") MaterialRequestStatus status);
 
-    /** Advances the MR through its lifecycle: DRAFT → SUBMITTED → APPROVED → PO_CREATED → COMPLETED. */
-    @Update("UPDATE material_requests SET status = #{status} WHERE id = #{id}")
-    int updateStatus(@Param("id") Long id, @Param("status") MaterialRequestStatus status);
+    /**
+     * Advances the MR through its lifecycle: DRAFT → SUBMITTED → APPROVED → PO_CREATED → COMPLETED.
+     * Only matches while the MR is still in expectedStatus, so two concurrent transitions on the
+     * same MR (e.g. two generate-PO calls) can't both succeed.
+     */
+    @Update("UPDATE material_requests SET status = #{newStatus} WHERE id = #{id} AND status = #{expectedStatus}")
+    int updateStatus(@Param("id") Long id,
+                     @Param("expectedStatus") MaterialRequestStatus expectedStatus,
+                     @Param("newStatus") MaterialRequestStatus newStatus);
 
     /**
      * Lists requests by status with the requester's name resolved, for the

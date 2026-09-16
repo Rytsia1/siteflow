@@ -105,13 +105,18 @@ public class BorrowService {
         if (borrowItem == null) {
             throw new IllegalArgumentException("Borrow item not found: " + borrowItemId);
         }
-        int alreadyReturned = borrowItem.getQtyReturned() == null ? 0 : borrowItem.getQtyReturned();
-        if (qtyReturned <= 0 || qtyReturned > borrowItem.getQtyBorrowed() - alreadyReturned) {
-            throw new IllegalArgumentException("Invalid return quantity for borrow item " + borrowItemId);
+        if (qtyReturned <= 0) {
+            throw new IllegalArgumentException("Return quantity must be positive for borrow item " + borrowItemId);
         }
 
         LocalDateTime now = LocalDateTime.now();
-        borrowItemMapper.recordReturn(borrowItemId, qtyReturned, now);
+        // Atomically guarded: matches zero rows if this would push qty_returned past qty_borrowed,
+        // whether because the line was already fully returned or another request raced this one.
+        if (borrowItemMapper.recordReturn(borrowItemId, qtyReturned, now) == 0) {
+            throw new IllegalStateException(
+                    "Return quantity " + qtyReturned + " for borrow item " + borrowItemId
+                    + " exceeds the outstanding balance.");
+        }
 
         BorrowRequest borrowRequest = borrowRequestMapper.findById(borrowItem.getBorrowRequestId());
         ItemStock stock = itemStockMapper.findByItemIdAndLocationId(borrowItem.getItemId(),

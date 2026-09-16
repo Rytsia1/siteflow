@@ -26,8 +26,11 @@ import com.siteflow.web.dto.MaterialRequestView;
  *   APPROVED → PO_CREATED  (generatePurchaseOrder)
  *   PO_CREATED → COMPLETED (markMaterialRequestCompleted — when goods are received)
  *
- * PO lifecycle:
- *   ISSUED → PARTIAL_RECEIVED → FULFILLED  (managed externally / receiving service)
+ * PO lifecycle: PurchaseOrderStatus defines ISSUED, PARTIAL_RECEIVED and FULFILLED, and
+ * every PO is created ISSUED here, but no receiving workflow exists yet to advance a PO
+ * past ISSUED — there is no per-line received-quantity data anywhere in the schema for
+ * it to act on. Do not assume PARTIAL_RECEIVED/FULFILLED are reachable; they currently
+ * are not.
  */
 @Service
 public class ProcurementService {
@@ -118,10 +121,10 @@ public class ProcurementService {
      */
     @Transactional
     public MaterialRequest approveMaterialRequest(Long mrId) {
-        MaterialRequest mr = requireMrInStatus(mrId, MaterialRequestStatus.SUBMITTED);
+        requireMrInStatus(mrId, MaterialRequestStatus.SUBMITTED);
 
         // Transition: SUBMITTED → APPROVED — request is now eligible for a PO
-        materialRequestMapper.updateStatus(mrId, MaterialRequestStatus.APPROVED);
+        updateMrStatusOrThrow(mrId, MaterialRequestStatus.SUBMITTED, MaterialRequestStatus.APPROVED);
         return materialRequestMapper.findById(mrId);
     }
 
@@ -145,9 +148,10 @@ public class ProcurementService {
      *   MR:  APPROVED → PO_CREATED   (the MR is now linked to a concrete order)
      *   PO:  (new)    → ISSUED       (the PO starts as a newly-issued order)
      *
-     * <p>Both the MR status update and the PO insert happen inside one transaction.
-     * If the PO insert fails (e.g. duplicate po_number collision), the MR status
-     * rolls back to APPROVED so the operation can be retried safely.
+     * <p>The MR status is claimed (APPROVED → PO_CREATED) atomically <em>before</em> the PO
+     * is built, so a request that loses a concurrency race to generate a PO for the same MR
+     * fails before creating anything; if the later PO insert itself fails (e.g. duplicate
+     * po_number collision), the whole transaction rolls back, including the status claim.
      *
      * <p>The PO number is auto-generated as "PO-{mrId}-{timestamp}" to guarantee
      * uniqueness. A more sophisticated numbering scheme (e.g. fiscal-year prefix)
@@ -162,7 +166,11 @@ public class ProcurementService {
     public PurchaseOrder generatePurchaseOrder(Long mrId, String supplierName,
                                                LocalDateTime expectedDeliveryDate) {
         // Guard: only APPROVED MRs can be converted to a PO
-        MaterialRequest mr = requireMrInStatus(mrId, MaterialRequestStatus.APPROVED);
+        requireMrInStatus(mrId, MaterialRequestStatus.APPROVED);
+
+        // Claim the transition first: APPROVED → PO_CREATED. Only one concurrent caller
+        // can win this atomic compare-and-swap, so at most one PO is ever created per MR.
+        updateMrStatusOrThrow(mrId, MaterialRequestStatus.APPROVED, MaterialRequestStatus.PO_CREATED);
 
         // Generate a unique, human-readable PO number: "PO-{mrId}-{yyyyMMdd-HHmmss}"
         String poNumber = "PO-" + mrId + "-" + LocalDateTime.now().format(PO_DATE_FORMAT);
@@ -177,11 +185,6 @@ public class ProcurementService {
                 .poStatus(PurchaseOrderStatus.ISSUED)   // initial state: order sent to supplier
                 .build();
         purchaseOrderMapper.insert(po);
-
-        // Transition MR: APPROVED → PO_CREATED
-        // The MR is now linked to a live purchase order; no further POs should
-        // be generated for it without first cancelling the existing one.
-        materialRequestMapper.updateStatus(mrId, MaterialRequestStatus.PO_CREATED);
 
         return po;
     }
@@ -203,13 +206,26 @@ public class ProcurementService {
         requireMrInStatus(mrId, MaterialRequestStatus.PO_CREATED);
 
         // Transition: PO_CREATED → COMPLETED — procurement cycle is closed
-        materialRequestMapper.updateStatus(mrId, MaterialRequestStatus.COMPLETED);
+        updateMrStatusOrThrow(mrId, MaterialRequestStatus.PO_CREATED, MaterialRequestStatus.COMPLETED);
         return materialRequestMapper.findById(mrId);
     }
 
     // =========================================================================
     // Private helpers
     // =========================================================================
+
+    /**
+     * Atomically writes the MR's new status, guarded by the expected current status,
+     * and throws if the write matched zero rows (the MR was concurrently moved out of
+     * that status by another request between this method's pre-check and this write).
+     */
+    private void updateMrStatusOrThrow(Long mrId, MaterialRequestStatus expected, MaterialRequestStatus newStatus) {
+        int updated = materialRequestMapper.updateStatus(mrId, expected, newStatus);
+        if (updated == 0) {
+            throw new IllegalStateException(
+                    "Material request " + mrId + " was concurrently modified and is no longer " + expected + ".");
+        }
+    }
 
     /**
      * Loads the MR and asserts it is in the expected status.

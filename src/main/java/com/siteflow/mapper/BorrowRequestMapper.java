@@ -34,13 +34,16 @@ public interface BorrowRequestMapper {
     /**
      * Records an approval decision: sets the approval_status (APPROVED or REJECTED),
      * the id of the admin who decided, and an optional explanatory note, all in one
-     * atomic write so no partial approval state is ever persisted.
+     * atomic write so no partial approval state is ever persisted. The WHERE clause
+     * only matches while the request is still in expectedStatus, so two concurrent
+     * approve/reject calls on the same request can't both succeed.
      */
     @Update("UPDATE borrow_requests "
-            + "SET approval_status = #{approvalStatus}, approved_by = #{approvedBy}, approval_note = #{note} "
-            + "WHERE id = #{id}")
+            + "SET approval_status = #{newStatus}, approved_by = #{approvedBy}, approval_note = #{note} "
+            + "WHERE id = #{id} AND approval_status = #{expectedStatus}")
     int updateApproval(@Param("id") Long id,
-                       @Param("approvalStatus") ApprovalStatus approvalStatus,
+                       @Param("expectedStatus") ApprovalStatus expectedStatus,
+                       @Param("newStatus") ApprovalStatus newStatus,
                        @Param("approvedBy") Long approvedBy,
                        @Param("note") String note);
 

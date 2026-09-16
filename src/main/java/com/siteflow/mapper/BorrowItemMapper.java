@@ -26,8 +26,14 @@ public interface BorrowItemMapper {
     @Select("SELECT * FROM borrow_items WHERE borrow_request_id = #{borrowRequestId}")
     List<BorrowItem> findByBorrowRequestId(Long borrowRequestId);
 
+    /**
+     * Adds qtyReturned to the line's running total. The WHERE clause guards that the
+     * result can't exceed qty_borrowed, so this is safe to call from concurrent
+     * requests — at most one of two racing returns for the same remaining balance
+     * will match a row.
+     */
     @Update("UPDATE borrow_items SET qty_returned = qty_returned + #{qtyReturned}, return_date = #{returnDate} "
-            + "WHERE id = #{id}")
+            + "WHERE id = #{id} AND qty_returned + #{qtyReturned} <= qty_borrowed")
     int recordReturn(@Param("id") Long id, @Param("qtyReturned") int qtyReturned,
             @Param("returnDate") LocalDateTime returnDate);
 }
