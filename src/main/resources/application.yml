@@ -3,8 +3,8 @@ spring:
     name: siteflow
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:siteflow}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root}
+    username: root
+    password: Shizukusan1412
     driver-class-name: com.mysql.cj.jdbc.Driver
   flyway:
     enabled: true
