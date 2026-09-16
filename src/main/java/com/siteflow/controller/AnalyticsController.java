@@ -17,6 +17,7 @@ import com.siteflow.web.dto.ConsumptionTrendView;
 import com.siteflow.web.dto.DashboardSummaryView;
 import com.siteflow.web.dto.DemandForecastView;
 import com.siteflow.web.dto.ItemSummaryView;
+import com.siteflow.web.dto.ToolUtilizationView;
 
 @RestController
 @RequestMapping("/api/analytics")
@@ -45,6 +46,11 @@ public class AnalyticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return ApiResponse.success("Consumption trends retrieved.",
                 analyticsService.getConsumptionTrends(startDate, endDate));
+    }
+
+    @GetMapping("/tool-utilization")
+    public ApiResponse<List<ToolUtilizationView>> getToolUtilization() {
+        return ApiResponse.success("Tool utilization retrieved.", analyticsService.getToolUtilization());
     }
 
     @GetMapping("/forecast/{itemId}")

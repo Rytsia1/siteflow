@@ -16,6 +16,7 @@ import com.siteflow.web.dto.ItemSummaryView;
 import com.siteflow.web.dto.MonthlyConsumptionView;
 import com.siteflow.web.dto.MostBorrowedItemView;
 import com.siteflow.web.dto.ReorderRecommendationView;
+import com.siteflow.web.dto.ToolUtilizationView;
 
 @Service
 public class AnalyticsService {
@@ -50,6 +51,11 @@ public class AnalyticsService {
     @Transactional(readOnly = true)
     public List<ConsumptionTrendView> getConsumptionTrends(LocalDate startDate, LocalDate endDate) {
         return analyticsMapper.findConsumptionTrends(startDate.atStartOfDay(), endDate.atTime(23, 59, 59));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ToolUtilizationView> getToolUtilization() {
+        return analyticsMapper.findToolUtilization();
     }
 
     /**

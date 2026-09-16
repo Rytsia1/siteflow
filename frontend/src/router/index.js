@@ -6,6 +6,7 @@ import BorrowForm from '../views/BorrowForm.vue'
 import ApprovalDashboard from '../views/ApprovalDashboard.vue'
 import AssetScanner from '../views/AssetScanner.vue'
 import ProcurementView from '../views/ProcurementView.vue'
+import AnalyticsDashboard from '../views/AnalyticsDashboard.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -27,6 +28,12 @@ const router = createRouter({
       meta: { roles: ['ADMIN', 'WAREHOUSE_STAFF'] },
     },
     { path: '/procurement', name: 'procurement', component: ProcurementView },
+    {
+      path: '/analytics',
+      name: 'analytics',
+      component: AnalyticsDashboard,
+      meta: { roles: ['ADMIN'] },
+    },
   ],
 })
 
