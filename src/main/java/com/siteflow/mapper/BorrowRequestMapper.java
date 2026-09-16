@@ -1,5 +1,10 @@
 package com.siteflow.mapper;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.apache.ibatis.annotations.Arg;
+import org.apache.ibatis.annotations.ConstructorArgs;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -10,6 +15,7 @@ import org.apache.ibatis.annotations.Update;
 import com.siteflow.domain.BorrowRequest;
 import com.siteflow.domain.enums.ApprovalStatus;
 import com.siteflow.domain.enums.BorrowStatus;
+import com.siteflow.web.dto.BorrowRequestView;
 
 @Mapper
 public interface BorrowRequestMapper {
@@ -37,5 +43,26 @@ public interface BorrowRequestMapper {
                        @Param("approvalStatus") ApprovalStatus approvalStatus,
                        @Param("approvedBy") Long approvedBy,
                        @Param("note") String note);
+
+    /**
+     * Lists requests by approval status with requester/location names resolved,
+     * for the admin approval dashboard (avoids a raw-id-only table in the UI).
+     */
+    @Select("SELECT br.id AS id, u.full_name AS requester_name, l.location_name AS location_name, "
+            + "br.request_date AS request_date, br.status AS status, br.approval_status AS approval_status "
+            + "FROM borrow_requests br "
+            + "JOIN users u ON u.id = br.user_id "
+            + "JOIN locations l ON l.id = br.location_id "
+            + "WHERE br.approval_status = #{approvalStatus} "
+            + "ORDER BY br.request_date")
+    @ConstructorArgs({
+            @Arg(column = "id", javaType = Long.class),
+            @Arg(column = "requester_name", javaType = String.class),
+            @Arg(column = "location_name", javaType = String.class),
+            @Arg(column = "request_date", javaType = LocalDateTime.class),
+            @Arg(column = "status", javaType = BorrowStatus.class),
+            @Arg(column = "approval_status", javaType = ApprovalStatus.class)
+    })
+    List<BorrowRequestView> findByApprovalStatusWithDetails(@Param("approvalStatus") ApprovalStatus approvalStatus);
 }
 

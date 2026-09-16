@@ -1,11 +1,14 @@
 package com.siteflow.service;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.siteflow.domain.BorrowRequest;
 import com.siteflow.domain.enums.ApprovalStatus;
 import com.siteflow.mapper.BorrowRequestMapper;
+import com.siteflow.web.dto.BorrowRequestView;
 
 /**
  * Manages the approval workflow for borrow requests.
@@ -74,6 +77,15 @@ public class ApprovalService {
         borrowRequestMapper.updateApproval(requestId, ApprovalStatus.REJECTED, adminId, note);
 
         return borrowRequestMapper.findById(requestId);
+    }
+
+    /**
+     * Lists borrow requests currently awaiting admin decision, for the
+     * approval dashboard.
+     */
+    @Transactional(readOnly = true)
+    public List<BorrowRequestView> listPendingBorrowRequests() {
+        return borrowRequestMapper.findByApprovalStatusWithDetails(ApprovalStatus.PENDING_APPROVAL);
     }
 
     // -------------------------------------------------------------------------

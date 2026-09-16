@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { login } from '../auth'
+import { login, setRole } from '../auth'
 import http from '../api/http'
 
 const router = useRouter()
@@ -27,7 +27,8 @@ async function handleSubmit() {
   // a real protected endpoint. The interceptor's 401 handler shows the error toast.
   login(form.username, form.password)
   try {
-    await http.get('/items')
+    const me = await http.get('/auth/me')
+    setRole(me.role)
     router.push('/inventory')
   } catch {
     // interceptor already surfaced the error and cleared auth

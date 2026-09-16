@@ -1,4 +1,6 @@
 package com.siteflow.web.dto;
 
-public record RejectBorrowRequestDto(String note) {
+import jakarta.validation.constraints.NotBlank;
+
+public record RejectBorrowRequestDto(@NotBlank String note) {
 }

@@ -1,7 +1,10 @@
 package com.siteflow.mapper;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
+import org.apache.ibatis.annotations.Arg;
+import org.apache.ibatis.annotations.ConstructorArgs;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -11,6 +14,7 @@ import org.apache.ibatis.annotations.Update;
 
 import com.siteflow.domain.MaterialRequest;
 import com.siteflow.domain.enums.MaterialRequestStatus;
+import com.siteflow.web.dto.MaterialRequestView;
 
 @Mapper
 public interface MaterialRequestMapper {
@@ -32,4 +36,23 @@ public interface MaterialRequestMapper {
     /** Advances the MR through its lifecycle: DRAFT → SUBMITTED → APPROVED → PO_CREATED → COMPLETED. */
     @Update("UPDATE material_requests SET status = #{status} WHERE id = #{id}")
     int updateStatus(@Param("id") Long id, @Param("status") MaterialRequestStatus status);
+
+    /**
+     * Lists requests by status with the requester's name resolved, for the
+     * procurement dashboard (avoids a raw-user-id-only table in the UI).
+     */
+    @Select("SELECT mr.id AS id, u.full_name AS requester_name, mr.justification AS justification, "
+            + "mr.request_date AS request_date, mr.status AS status "
+            + "FROM material_requests mr "
+            + "JOIN users u ON u.id = mr.requested_by "
+            + "WHERE mr.status = #{status} "
+            + "ORDER BY mr.request_date")
+    @ConstructorArgs({
+            @Arg(column = "id", javaType = Long.class),
+            @Arg(column = "requester_name", javaType = String.class),
+            @Arg(column = "justification", javaType = String.class),
+            @Arg(column = "request_date", javaType = LocalDateTime.class),
+            @Arg(column = "status", javaType = MaterialRequestStatus.class)
+    })
+    List<MaterialRequestView> findByStatusWithDetails(@Param("status") MaterialRequestStatus status);
 }

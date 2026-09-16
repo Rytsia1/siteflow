@@ -15,6 +15,7 @@ import com.siteflow.domain.enums.PurchaseOrderStatus;
 import com.siteflow.mapper.MaterialRequestItemMapper;
 import com.siteflow.mapper.MaterialRequestMapper;
 import com.siteflow.mapper.PurchaseOrderMapper;
+import com.siteflow.web.dto.MaterialRequestView;
 
 /**
  * Manages the full procurement pipeline: Material Request → Purchase Order.
@@ -122,6 +123,15 @@ public class ProcurementService {
         // Transition: SUBMITTED → APPROVED — request is now eligible for a PO
         materialRequestMapper.updateStatus(mrId, MaterialRequestStatus.APPROVED);
         return materialRequestMapper.findById(mrId);
+    }
+
+    /**
+     * Lists material requests in the given status, with requester name
+     * resolved, for the procurement dashboard.
+     */
+    @Transactional(readOnly = true)
+    public List<MaterialRequestView> listMaterialRequestsByStatus(MaterialRequestStatus status) {
+        return materialRequestMapper.findByStatusWithDetails(status);
     }
 
     // =========================================================================

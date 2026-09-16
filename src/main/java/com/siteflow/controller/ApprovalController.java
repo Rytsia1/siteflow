@@ -1,7 +1,10 @@
 package com.siteflow.controller;
 
+import java.util.List;
+
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,7 +16,10 @@ import com.siteflow.security.UserPrincipal;
 import com.siteflow.service.ApprovalService;
 import com.siteflow.web.ApiResponse;
 import com.siteflow.web.dto.ApproveBorrowRequestDto;
+import com.siteflow.web.dto.BorrowRequestView;
 import com.siteflow.web.dto.RejectBorrowRequestDto;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/approvals/borrow-requests")
@@ -23,6 +29,16 @@ public class ApprovalController {
 
     public ApprovalController(ApprovalService approvalService) {
         this.approvalService = approvalService;
+    }
+
+    /**
+     * Lists borrow requests currently pending admin decision.
+     * Accessible only by administrators.
+     */
+    @GetMapping("/pending")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<BorrowRequestView>> listPending() {
+        return ApiResponse.success("Pending borrow requests retrieved.", approvalService.listPendingBorrowRequests());
     }
 
     /**
@@ -48,10 +64,9 @@ public class ApprovalController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<BorrowRequest> rejectBorrowRequest(
             @PathVariable Long id,
-            @RequestBody(required = false) RejectBorrowRequestDto dto,
+            @RequestBody @Valid RejectBorrowRequestDto dto,
             @AuthenticationPrincipal UserPrincipal principal) {
-        String note = (dto != null) ? dto.note() : null;
-        BorrowRequest rejected = approvalService.rejectBorrowRequest(id, principal.getUserId(), note);
+        BorrowRequest rejected = approvalService.rejectBorrowRequest(id, principal.getUserId(), dto.note());
         return ApiResponse.success("Borrow request rejected.", rejected);
     }
 }

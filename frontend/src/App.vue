@@ -17,6 +17,11 @@ function handleLogout() {
       <el-menu mode="horizontal" router :default-active="$route.path" class="nav-menu">
         <el-menu-item index="/inventory">Inventory</el-menu-item>
         <el-menu-item index="/borrow">Borrow Request</el-menu-item>
+        <el-menu-item index="/procurement">Procurement</el-menu-item>
+        <el-menu-item v-if="auth.role === 'ADMIN' || auth.role === 'WAREHOUSE_STAFF'" index="/assets">
+          Asset Scanner
+        </el-menu-item>
+        <el-menu-item v-if="auth.role === 'ADMIN'" index="/approvals">Approvals</el-menu-item>
       </el-menu>
       <div class="user-info">
         <span>{{ auth.username }}</span>

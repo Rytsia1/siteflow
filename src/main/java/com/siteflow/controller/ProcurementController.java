@@ -6,19 +6,23 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.siteflow.domain.MaterialRequest;
 import com.siteflow.domain.PurchaseOrder;
+import com.siteflow.domain.enums.MaterialRequestStatus;
 import com.siteflow.security.UserPrincipal;
 import com.siteflow.service.ProcurementService;
 import com.siteflow.web.ApiResponse;
 import com.siteflow.web.dto.GeneratePoDto;
 import com.siteflow.web.dto.MaterialRequestDto;
+import com.siteflow.web.dto.MaterialRequestView;
 
 import jakarta.validation.Valid;
 
@@ -30,6 +34,18 @@ public class ProcurementController {
 
     public ProcurementController(ProcurementService procurementService) {
         this.procurementService = procurementService;
+    }
+
+    /**
+     * Lists material requests in the given status (e.g. APPROVED, awaiting PO generation).
+     * Accessible only by users with ADMIN or PROCUREMENT role.
+     */
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROCUREMENT')")
+    public ApiResponse<List<MaterialRequestView>> listMaterialRequests(
+            @RequestParam MaterialRequestStatus status) {
+        return ApiResponse.success("Material requests retrieved.",
+                procurementService.listMaterialRequestsByStatus(status));
     }
 
     /**
