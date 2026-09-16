@@ -1,0 +1,129 @@
+package com.siteflow.service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.siteflow.domain.BorrowItem;
+import com.siteflow.domain.BorrowRequest;
+import com.siteflow.domain.ItemStock;
+import com.siteflow.domain.TransactionLog;
+import com.siteflow.domain.enums.BorrowStatus;
+import com.siteflow.domain.enums.TransactionType;
+import com.siteflow.mapper.BorrowItemMapper;
+import com.siteflow.mapper.BorrowRequestMapper;
+import com.siteflow.mapper.ItemStockMapper;
+import com.siteflow.mapper.TransactionLogMapper;
+
+@Service
+public class BorrowService {
+
+    private final BorrowRequestMapper borrowRequestMapper;
+    private final BorrowItemMapper borrowItemMapper;
+    private final ItemStockMapper itemStockMapper;
+    private final TransactionLogMapper transactionLogMapper;
+
+    public BorrowService(BorrowRequestMapper borrowRequestMapper, BorrowItemMapper borrowItemMapper,
+            ItemStockMapper itemStockMapper, TransactionLogMapper transactionLogMapper) {
+        this.borrowRequestMapper = borrowRequestMapper;
+        this.borrowItemMapper = borrowItemMapper;
+        this.itemStockMapper = itemStockMapper;
+        this.transactionLogMapper = transactionLogMapper;
+    }
+
+    public record BorrowItemRequest(Long itemId, int qty) {
+    }
+
+    /**
+     * Creates a borrow request and allocates stock for each requested item in one transaction:
+     * stock availability is checked up front, then each item is recorded, stock is decremented,
+     * and a BORROW transaction log is written. Any failure rolls back the whole request.
+     */
+    @Transactional
+    public BorrowRequest createBorrowRequest(Long userId, Long locationId, List<BorrowItemRequest> items) {
+        for (BorrowItemRequest request : items) {
+            ItemStock stock = itemStockMapper.findByItemIdAndLocationId(request.itemId(), locationId);
+            if (stock == null || stock.getCurrentQty() < request.qty()) {
+                throw new IllegalStateException(
+                        "Insufficient stock for item " + request.itemId() + " at location " + locationId);
+            }
+        }
+
+        BorrowRequest borrowRequest = BorrowRequest.builder()
+                .userId(userId)
+                .locationId(locationId)
+                .requestDate(LocalDateTime.now())
+                .status(BorrowStatus.BORROWED)
+                .build();
+        borrowRequestMapper.insert(borrowRequest);
+
+        for (BorrowItemRequest request : items) {
+            BorrowItem borrowItem = BorrowItem.builder()
+                    .borrowRequestId(borrowRequest.getId())
+                    .itemId(request.itemId())
+                    .qtyBorrowed(request.qty())
+                    .qtyReturned(0)
+                    .build();
+            borrowItemMapper.insert(borrowItem);
+
+            ItemStock stock = itemStockMapper.findByItemIdAndLocationId(request.itemId(), locationId);
+            itemStockMapper.adjustQty(stock.getId(), -request.qty());
+
+            transactionLogMapper.insert(TransactionLog.builder()
+                    .itemId(request.itemId())
+                    .locationId(locationId)
+                    .userId(userId)
+                    .transactionType(TransactionType.BORROW)
+                    .qtyChange(-request.qty())
+                    .referenceId(borrowRequest.getId())
+                    .timestamp(LocalDateTime.now())
+                    .build());
+        }
+
+        return borrowRequest;
+    }
+
+    /**
+     * Records a return against a borrowed item, restores the returned quantity to stock,
+     * logs a RETURN transaction, and updates the parent request's status to COMPLETED or
+     * PARTIAL_RETURN depending on whether every item in the request has now been fully returned.
+     * All steps run in one transaction so a partial failure leaves no partial state.
+     */
+    @Transactional
+    public void processReturn(Long borrowItemId, int qtyReturned, Long userId) {
+        BorrowItem borrowItem = borrowItemMapper.findById(borrowItemId);
+        if (borrowItem == null) {
+            throw new IllegalArgumentException("Borrow item not found: " + borrowItemId);
+        }
+        int alreadyReturned = borrowItem.getQtyReturned() == null ? 0 : borrowItem.getQtyReturned();
+        if (qtyReturned <= 0 || qtyReturned > borrowItem.getQtyBorrowed() - alreadyReturned) {
+            throw new IllegalArgumentException("Invalid return quantity for borrow item " + borrowItemId);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        borrowItemMapper.recordReturn(borrowItemId, qtyReturned, now);
+
+        BorrowRequest borrowRequest = borrowRequestMapper.findById(borrowItem.getBorrowRequestId());
+        ItemStock stock = itemStockMapper.findByItemIdAndLocationId(borrowItem.getItemId(),
+                borrowRequest.getLocationId());
+        itemStockMapper.adjustQty(stock.getId(), qtyReturned);
+
+        transactionLogMapper.insert(TransactionLog.builder()
+                .itemId(borrowItem.getItemId())
+                .locationId(borrowRequest.getLocationId())
+                .userId(userId)
+                .transactionType(TransactionType.RETURN)
+                .qtyChange(qtyReturned)
+                .referenceId(borrowRequest.getId())
+                .timestamp(now)
+                .build());
+
+        List<BorrowItem> allItems = borrowItemMapper.findByBorrowRequestId(borrowRequest.getId());
+        boolean allReturned = allItems.stream()
+                .allMatch(item -> item.getQtyReturned() != null && item.getQtyReturned().equals(item.getQtyBorrowed()));
+        borrowRequestMapper.updateStatus(borrowRequest.getId(),
+                allReturned ? BorrowStatus.COMPLETED : BorrowStatus.PARTIAL_RETURN);
+    }
+}
