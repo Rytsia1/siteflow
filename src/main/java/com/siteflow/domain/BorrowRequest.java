@@ -23,5 +23,6 @@ public class BorrowRequest {
     private ApprovalStatus approvalStatus;
     private Long approvedBy;
     private String approvalNote;
+    private LocalDateTime updatedAt;
 }
 
