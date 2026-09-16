@@ -205,7 +205,7 @@ siteflow/
     │   ├── api/http.js                  # Axios instance, auth header, centralized error toasts
     │   ├── auth.js                      # Client-side auth/session state (sessionStorage)
     │   └── App.vue                      # Shell layout + role-gated nav menu
-    └── vite.config.js                   # Dev server + /api proxy to localhost:8080
+    └── vite.config.js                   # Dev server + /api proxy (VITE_API_PROXY_TARGET, default localhost:8080)
 ```
 
 ## Database
@@ -253,23 +253,27 @@ Key entities:
 
 ## Environment Variables
 
-The datasource URL, host, port and server port are externalized via `application.yml` using `${VAR:default}` placeholders:
+`src/main/resources/application.yml` resolves every datasource and server setting from OS environment variables via `${VAR:default}` placeholders — no credentials are hardcoded or committed. Copy [`.env.example`](.env.example) for a documented list of what to set; Spring Boot does not load `.env` files itself, so export these in your shell profile, IDE run configuration, or process manager.
 
 | Variable | Default | Description |
 |---|---|---|
 | `DB_HOST` | `localhost` | MySQL host |
 | `DB_PORT` | `3306` | MySQL port |
 | `DB_NAME` | `siteflow` | MySQL schema/database name |
+| `DB_USERNAME` | `root` | MySQL username |
+| `DB_PASSWORD` | *(none — required)* | MySQL password. The app fails to start with a clear error if this isn't set; there is deliberately no default. |
 | `SERVER_PORT` | `8080` | Port the Spring Boot application listens on |
 
-**Note:** the database `username`/`password` in `src/main/resources/application.yml` are currently set directly in the file rather than read from environment variables. Before running this project against your own MySQL instance, edit those two values locally to match your setup, and avoid committing real credentials to the file. Externalizing them via `DB_USERNAME`/`DB_PASSWORD` environment variables is listed under [Roadmap](#roadmap-planned--not-implemented).
+The frontend has its own, separate `.env.example` under [`frontend/`](frontend/.env.example) — see [Running Locally](#running-locally).
 
-Example local configuration (values are placeholders):
+Example local configuration:
 
 ```bash
 export DB_HOST=localhost
 export DB_PORT=3306
 export DB_NAME=siteflow
+export DB_USERNAME=root
+export DB_PASSWORD=your-local-mysql-password
 export SERVER_PORT=8080
 ```
 
@@ -281,8 +285,12 @@ export SERVER_PORT=8080
 # 1. Create a local MySQL database (name must match DB_NAME, default "siteflow")
 mysql -u root -p -e "CREATE DATABASE siteflow;"
 
-# 2. Set the datasource username/password for your local MySQL instance
-#    in src/main/resources/application.yml (see Environment Variables above)
+# 2. Set DB_USERNAME/DB_PASSWORD (and DB_HOST/DB_PORT/DB_NAME if you're not using the
+#    defaults) for your local MySQL instance — see .env.example and Environment
+#    Variables above. Export them in your shell, or set them in your IDE's run
+#    configuration; this project does not read a .env file automatically.
+export DB_USERNAME=root
+export DB_PASSWORD=your-local-mysql-password
 
 # 3. Run the API — Flyway applies all migrations and seed data automatically on startup
 mvn spring-boot:run
@@ -298,7 +306,7 @@ npm install
 npm run dev
 ```
 
-The Vite dev server proxies any request to `/api` through to `http://localhost:8080` (see `frontend/vite.config.js`), so the backend must be running first. For a production build:
+The Vite dev server proxies any request to `/api` through to `http://localhost:8080` by default (see `frontend/vite.config.js`), so the backend must be running first. If your backend runs on a different host/port, copy [`frontend/.env.example`](frontend/.env.example) to `frontend/.env.local` and set `VITE_API_PROXY_TARGET` accordingly — Vite loads `.env*` files automatically, no extra setup needed. For a production build:
 
 ```bash
 npm run build
@@ -355,7 +363,6 @@ The following are explicitly **not** implemented yet and are listed here so they
 - **Material request approval / completion endpoints.** `ProcurementService.approveMaterialRequest()` (SUBMITTED → APPROVED) and `markMaterialRequestCompleted()` (PO_CREATED → COMPLETED) exist at the service layer but are not wired to any controller endpoint.
 - **Manual stock adjustments.** The `stock_adjustments` table, `StockAdjustment` domain entity, and `AdjustmentType` enum exist in the schema/codebase, but there is no mapper, service, or REST endpoint for creating adjustments.
 - **A dedicated `PROCUREMENT` role.** Referenced in `@PreAuthorize` annotations but not yet seeded or assignable through any UI/API.
-- **Externalized database credentials.** `DB_USERNAME`/`DB_PASSWORD` environment variable support (currently hardcoded in `application.yml`).
 - **Automated frontend testing** (e.g. Vitest for unit tests, Playwright/Cypress for E2E).
 - **CI pipeline** (no GitHub Actions workflow currently exists in this repository).
 - **Multi-tenant / multi-project support** — the schema currently models a single organization's locations and inventory.
