@@ -8,10 +8,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.siteflow.domain.Item;
 import com.siteflow.service.InventoryService;
 import com.siteflow.web.ApiResponse;
 import com.siteflow.web.dto.ItemStockView;
+import com.siteflow.web.dto.ItemSummaryView;
 
 @RestController
 @RequestMapping("/api/items")
@@ -25,7 +25,7 @@ public class InventoryController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF', 'FIELD_STAFF')")
-    public ApiResponse<List<Item>> listItems() {
+    public ApiResponse<List<ItemSummaryView>> listItems() {
         return ApiResponse.success("Items retrieved.", inventoryService.listItems());
     }
 
