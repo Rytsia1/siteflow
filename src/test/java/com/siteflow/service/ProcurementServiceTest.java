@@ -3,10 +3,12 @@ package com.siteflow.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -23,8 +25,9 @@ import com.siteflow.domain.enums.PurchaseOrderStatus;
 import com.siteflow.mapper.MaterialRequestItemMapper;
 import com.siteflow.mapper.MaterialRequestMapper;
 import com.siteflow.mapper.PurchaseOrderMapper;
-import com.siteflow.web.ResourceNotFoundException;
 import com.siteflow.service.ProcurementService.MrLineItem;
+import com.siteflow.web.ResourceNotFoundException;
+import com.siteflow.web.dto.MaterialRequestView;
 
 @ExtendWith(MockitoExtension.class)
 class ProcurementServiceTest {
@@ -51,6 +54,16 @@ class ProcurementServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
 
         verify(materialRequestMapper, never()).insert(any());
+        verify(materialRequestItemMapper, never()).insert(any());
+    }
+
+    @Test
+    @DisplayName("submitMaterialRequest rejects negative or zero quantity on individual items")
+    void submit_nonPositiveItemQty_throwsWithoutInserting() {
+        assertThatThrownBy(() -> procurementService.submitMaterialRequest(1L, "tools", List.of(new MrLineItem(5L, 0))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Requested quantity must be positive");
+
         verify(materialRequestItemMapper, never()).insert(any());
     }
 
@@ -210,9 +223,31 @@ class ProcurementServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("concurrently modified");
 
-        // The MR status claim is atomic and happens before the PO is built, so losing the
-        // race means no PO is ever inserted for this call.
         verify(purchaseOrderMapper, never()).insert(any());
+    }
+
+    @Test
+    @DisplayName("markMaterialRequestCompleted succeeds for a request in PO_CREATED status")
+    void markCompleted_validStatus_succeeds() {
+        MaterialRequest poCreated = MaterialRequest.builder().id(1L).status(MaterialRequestStatus.PO_CREATED).build();
+        MaterialRequest completed = MaterialRequest.builder().id(1L).status(MaterialRequestStatus.COMPLETED).build();
+        when(materialRequestMapper.findById(1L)).thenReturn(poCreated, completed);
+        when(materialRequestMapper.updateStatus(1L, MaterialRequestStatus.PO_CREATED, MaterialRequestStatus.COMPLETED))
+                .thenReturn(1);
+
+        MaterialRequest result = procurementService.markMaterialRequestCompleted(1L);
+
+        assertThat(result.getStatus()).isEqualTo(MaterialRequestStatus.COMPLETED);
+        verify(materialRequestMapper).updateStatus(1L, MaterialRequestStatus.PO_CREATED, MaterialRequestStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("markMaterialRequestCompleted fails when MR does not exist")
+    void markCompleted_unknownMr_throwsResourceNotFound() {
+        when(materialRequestMapper.findById(999L)).thenReturn(null);
+
+        assertThatThrownBy(() -> procurementService.markMaterialRequestCompleted(999L))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
@@ -225,5 +260,90 @@ class ProcurementServiceTest {
                 .isInstanceOf(IllegalStateException.class);
 
         verify(materialRequestMapper, never()).updateStatus(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("updatePurchaseOrderStatus advances ISSUED to PARTIAL_RECEIVED")
+    void updatePurchaseOrderStatus_issuedToPartialReceived_succeeds() {
+        PurchaseOrder issued = PurchaseOrder.builder().id(10L).poStatus(PurchaseOrderStatus.ISSUED).build();
+        PurchaseOrder partial = PurchaseOrder.builder().id(10L).poStatus(PurchaseOrderStatus.PARTIAL_RECEIVED).build();
+        when(purchaseOrderMapper.findById(10L)).thenReturn(issued, partial);
+        when(purchaseOrderMapper.updateStatusGuarded(10L, PurchaseOrderStatus.ISSUED, PurchaseOrderStatus.PARTIAL_RECEIVED))
+                .thenReturn(1);
+
+        PurchaseOrder result = procurementService.updatePurchaseOrderStatus(10L, PurchaseOrderStatus.PARTIAL_RECEIVED);
+
+        assertThat(result.getPoStatus()).isEqualTo(PurchaseOrderStatus.PARTIAL_RECEIVED);
+        verify(purchaseOrderMapper).updateStatusGuarded(10L, PurchaseOrderStatus.ISSUED, PurchaseOrderStatus.PARTIAL_RECEIVED);
+    }
+
+    @Test
+    @DisplayName("updatePurchaseOrderStatus advances PARTIAL_RECEIVED to FULFILLED")
+    void updatePurchaseOrderStatus_partialReceivedToFulfilled_succeeds() {
+        PurchaseOrder partial = PurchaseOrder.builder().id(10L).poStatus(PurchaseOrderStatus.PARTIAL_RECEIVED).build();
+        PurchaseOrder fulfilled = PurchaseOrder.builder().id(10L).poStatus(PurchaseOrderStatus.FULFILLED).build();
+        when(purchaseOrderMapper.findById(10L)).thenReturn(partial, fulfilled);
+        when(purchaseOrderMapper.updateStatusGuarded(10L, PurchaseOrderStatus.PARTIAL_RECEIVED, PurchaseOrderStatus.FULFILLED))
+                .thenReturn(1);
+
+        PurchaseOrder result = procurementService.updatePurchaseOrderStatus(10L, PurchaseOrderStatus.FULFILLED);
+
+        assertThat(result.getPoStatus()).isEqualTo(PurchaseOrderStatus.FULFILLED);
+    }
+
+    @Test
+    @DisplayName("updatePurchaseOrderStatus fails with 404 when PO does not exist")
+    void updatePurchaseOrderStatus_unknownPo_throwsResourceNotFound() {
+        when(purchaseOrderMapper.findById(404L)).thenReturn(null);
+
+        assertThatThrownBy(() -> procurementService.updatePurchaseOrderStatus(404L, PurchaseOrderStatus.FULFILLED))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("updatePurchaseOrderStatus rejects modifications once in terminal FULFILLED status")
+    void updatePurchaseOrderStatus_terminalFulfilled_throwsIllegalState() {
+        PurchaseOrder fulfilled = PurchaseOrder.builder().id(10L).poStatus(PurchaseOrderStatus.FULFILLED).build();
+        when(purchaseOrderMapper.findById(10L)).thenReturn(fulfilled);
+
+        assertThatThrownBy(() -> procurementService.updatePurchaseOrderStatus(10L, PurchaseOrderStatus.ISSUED))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("terminal status");
+    }
+
+    @Test
+    @DisplayName("updatePurchaseOrderStatus rejects invalid backward state transition")
+    void updatePurchaseOrderStatus_invalidTransition_throwsIllegalState() {
+        PurchaseOrder partial = PurchaseOrder.builder().id(10L).poStatus(PurchaseOrderStatus.PARTIAL_RECEIVED).build();
+        when(purchaseOrderMapper.findById(10L)).thenReturn(partial);
+
+        assertThatThrownBy(() -> procurementService.updatePurchaseOrderStatus(10L, PurchaseOrderStatus.ISSUED))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cannot transition purchase order");
+    }
+
+    @Test
+    @DisplayName("updatePurchaseOrderStatus detects concurrent modification when zero rows updated")
+    void updatePurchaseOrderStatus_concurrentConflict_throwsIllegalState() {
+        PurchaseOrder issued = PurchaseOrder.builder().id(10L).poStatus(PurchaseOrderStatus.ISSUED).build();
+        when(purchaseOrderMapper.findById(10L)).thenReturn(issued);
+        when(purchaseOrderMapper.updateStatusGuarded(10L, PurchaseOrderStatus.ISSUED, PurchaseOrderStatus.PARTIAL_RECEIVED))
+                .thenReturn(0);
+
+        assertThatThrownBy(() -> procurementService.updatePurchaseOrderStatus(10L, PurchaseOrderStatus.PARTIAL_RECEIVED))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("concurrently modified");
+    }
+
+    @Test
+    @DisplayName("listMaterialRequestsByStatus delegates to mapper")
+    void listMaterialRequestsByStatus_delegatesToMapper() {
+        MaterialRequestView view = new MaterialRequestView(1L, "Alice", "Emergency repairs",
+                LocalDateTime.now(), MaterialRequestStatus.APPROVED);
+        when(materialRequestMapper.findByStatusWithDetails(MaterialRequestStatus.APPROVED)).thenReturn(List.of(view));
+
+        List<MaterialRequestView> result = procurementService.listMaterialRequestsByStatus(MaterialRequestStatus.APPROVED);
+
+        assertThat(result).containsExactly(view);
     }
 }
