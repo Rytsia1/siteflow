@@ -1,10 +1,20 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { auth, logout } from '../auth'
-import router from '../router'
+import { auth, logout } from '../auth.js'
+import { dispatchApiError } from './error-handler.js'
+
+// Timeout defaults to 15 seconds unless overridden by VITE_API_TIMEOUT
+const timeout = Number(import.meta.env?.VITE_API_TIMEOUT) || 15000
+
+let routerInstance = null
+
+export function setRouter(router) {
+  routerInstance = router
+}
 
 const http = axios.create({
   baseURL: '/api',
+  timeout,
 })
 
 http.interceptors.request.use((config) => {
@@ -17,27 +27,28 @@ http.interceptors.request.use((config) => {
 http.interceptors.response.use(
   (response) => response.data.data,
   (error) => {
-    const status = error.response?.status
+    const currentPath = routerInstance?.currentRoute?.value?.path || ''
 
-    // 401 (missing/invalid credentials) is rejected by the Spring Security filter chain
-    // before @RestControllerAdvice runs, but ApiAuthenticationEntryPoint gives it the
-    // same ApiResponse envelope as every other error, so .message is safe to read here too.
-    if (status === 401) {
-      logout()
-      ElMessage.error(error.response.data?.message || 'Invalid credentials or session expired.')
-      router.push('/login')
-    } else if (status === 403) {
-      ElMessage.error(error.response.data?.message || 'Access denied.')
-    } else if (status >= 400 && status < 500) {
-      ElMessage.error(error.response.data?.message || 'Request failed.')
-    } else if (status >= 500) {
-      ElMessage.error(error.response.data?.message || 'An unexpected server error occurred.')
-    } else {
-      ElMessage.error('Cannot reach server.')
-    }
+    dispatchApiError(error, {
+      onLogout: logout,
+      onNavigate: (path) => {
+        if (routerInstance?.push) {
+          routerInstance.push(path).catch(() => {})
+        } else if (typeof window !== 'undefined' && window.location?.pathname !== path) {
+          window.location.href = path
+        }
+      },
+      showMessage: (msg) => {
+        if (typeof ElMessage !== 'undefined' && ElMessage.error) {
+          ElMessage.error(msg)
+        }
+      },
+      currentPath,
+    })
 
     return Promise.reject(error)
   },
 )
 
 export default http
+export { timeout }

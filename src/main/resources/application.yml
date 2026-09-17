@@ -12,6 +12,8 @@ spring:
     baseline-on-migrate: true
   mvc:
     throw-exception-if-no-handler-found: true
+    async:
+      request-timeout: ${SPRING_MVC_ASYNC_REQUEST_TIMEOUT:30000ms}
   web:
     resources:
       # This backend serves no static resources (the Vue SPA is built/served
@@ -30,6 +32,7 @@ server:
     include-stacktrace: never
     include-message: never
   tomcat:
+    connection-timeout: ${SERVER_TOMCAT_CONNECTION_TIMEOUT:20000ms}
     max-swallow-size: 2MB
     max-http-form-post-size: 2MB
 

@@ -14,10 +14,12 @@ function load() {
 export const auth = reactive(load())
 
 function persist() {
-  sessionStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ username: auth.username, token: auth.token, role: auth.role }),
-  )
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ username: auth.username, token: auth.token, role: auth.role }),
+    )
+  }
 }
 
 export function loginSuccess(token, username, role) {
@@ -36,7 +38,9 @@ export function logout() {
   auth.username = null
   auth.token = null
   auth.role = null
-  sessionStorage.removeItem(STORAGE_KEY)
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.removeItem(STORAGE_KEY)
+  }
 }
 
 export function isAuthenticated() {

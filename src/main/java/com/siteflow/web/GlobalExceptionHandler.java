@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -157,6 +158,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TooManyRequestsException.class)
     public ResponseEntity<ApiResponse<ErrorDetails>> handleTooManyRequests(
             TooManyRequestsException ex, HttpServletRequest request) {
+        if (ex.getRetryAfterSeconds() > 0) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Retry-After", String.valueOf(ex.getRetryAfterSeconds()));
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .headers(headers)
+                    .body(buildResponseBody(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request, null));
+        }
         return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
     }
 
@@ -214,8 +222,13 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ApiResponse<ErrorDetails>> buildError(
             HttpStatus status, String message, HttpServletRequest request, Map<String, String> fieldErrors) {
+        return ResponseEntity.status(status).body(buildResponseBody(status, message, request, fieldErrors));
+    }
+
+    private ApiResponse<ErrorDetails> buildResponseBody(
+            HttpStatus status, String message, HttpServletRequest request, Map<String, String> fieldErrors) {
         ErrorDetails details = new ErrorDetails(
                 LocalDateTime.now(), status.value(), status.getReasonPhrase(), request.getRequestURI(), fieldErrors);
-        return ResponseEntity.status(status).body(ApiResponse.error(message, details));
+        return ApiResponse.error(message, details);
     }
 }
