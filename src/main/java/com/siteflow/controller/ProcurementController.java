@@ -20,9 +20,11 @@ import com.siteflow.domain.enums.MaterialRequestStatus;
 import com.siteflow.security.UserPrincipal;
 import com.siteflow.service.ProcurementService;
 import com.siteflow.web.ApiResponse;
+import com.siteflow.web.dto.ApproveRequestDto;
 import com.siteflow.web.dto.GeneratePoDto;
 import com.siteflow.web.dto.MaterialRequestDto;
 import com.siteflow.web.dto.MaterialRequestView;
+import com.siteflow.web.dto.RejectRequestDto;
 
 import jakarta.validation.Valid;
 
@@ -68,6 +70,36 @@ public class ProcurementController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Material request submitted successfully.", created));
+    }
+
+    /**
+     * Approves a submitted material request, making it eligible for PO generation.
+     * Accessible only by administrators.
+     */
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<MaterialRequest> approveMaterialRequest(
+            @PathVariable Long id,
+            @RequestBody(required = false) ApproveRequestDto dto,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        MaterialRequest approved = procurementService.approveMaterialRequest(
+                id, principal.getUserId(), ApproveRequestDto.noteOf(dto));
+        return ApiResponse.success("Material request approved.", approved);
+    }
+
+    /**
+     * Rejects a submitted material request, terminating it. A required note explains
+     * why so the requester can amend and resubmit if appropriate.
+     * Accessible only by administrators.
+     */
+    @PostMapping("/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<MaterialRequest> rejectMaterialRequest(
+            @PathVariable Long id,
+            @RequestBody @Valid RejectRequestDto dto,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        MaterialRequest rejected = procurementService.rejectMaterialRequest(id, principal.getUserId(), dto.note());
+        return ApiResponse.success("Material request rejected.", rejected);
     }
 
     /**

@@ -59,10 +59,21 @@ class BorrowServiceTest {
 
         BorrowRequest created = borrowService.createBorrowRequest(7L, 10L, List.of(new BorrowItemRequest(1L, 2)));
 
-        assertThat(created.getStatus()).isEqualTo(BorrowStatus.BORROWED);
+        assertThat(created.getStatus()).isEqualTo(BorrowStatus.PENDING);
         assertThat(created.getApprovalStatus()).isEqualTo(ApprovalStatus.PENDING_APPROVAL);
         verify(borrowItemMapper).insert(any());
         verify(transactionLogMapper).insert(any());
+    }
+
+    @Test
+    @DisplayName("createBorrowRequest rejects a non-positive quantity without inserting anything")
+    void createBorrowRequest_nonPositiveQty_throwsWithoutSideEffects() {
+        assertThatThrownBy(() -> borrowService.createBorrowRequest(7L, 10L, List.of(new BorrowItemRequest(1L, 0))))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(borrowRequestMapper, never()).insert(any());
+        verify(itemStockMapper, never()).adjustQty(any(), anyInt());
+        verify(transactionLogMapper, never()).insert(any());
     }
 
     @Test
@@ -154,7 +165,9 @@ class BorrowServiceTest {
     void processReturn_alreadyFullyReturned_throwsWithoutSideEffects() {
         BorrowItem item = BorrowItem.builder().id(1L).borrowRequestId(9L).itemId(1L).qtyBorrowed(5).qtyReturned(5)
                 .build();
+        BorrowRequest request = BorrowRequest.builder().id(9L).locationId(10L).status(BorrowStatus.BORROWED).build();
         when(borrowItemMapper.findById(1L)).thenReturn(item);
+        when(borrowRequestMapper.findById(9L)).thenReturn(request);
         // The atomic UPDATE's WHERE guard is what actually rejects this — it matches zero rows
         // because qty_returned + 1 (6) would exceed qty_borrowed (5).
         when(borrowItemMapper.recordReturn(eq(1L), eq(1), any())).thenReturn(0);

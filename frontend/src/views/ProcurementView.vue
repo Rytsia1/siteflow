@@ -5,6 +5,10 @@ import http from '../api/http'
 import { auth } from '../auth'
 
 const isAdmin = computed(() => auth.role === 'ADMIN' || auth.role === 'PROCUREMENT')
+// Approve/reject is ADMIN-only (see backend ProcurementController), unlike list/generate-PO
+// which also allow PROCUREMENT — isAdmin above must not be reused here or a PROCUREMENT
+// user would see Approve/Reject buttons that always fail with 403.
+const canApprove = computed(() => auth.role === 'ADMIN')
 const activeTab = ref('submit')
 
 // ---- Tab 1: Submit Material Request ----
@@ -49,7 +53,75 @@ async function submitMaterialRequest() {
   }
 }
 
-// ---- Tab 2: Approved Requests -> Generate PO ----
+// ---- Tab 2: Pending Approval ----
+const pendingRequests = ref([])
+const loadingPending = ref(false)
+const approvingId = ref(null)
+
+const rejectDialogVisible = ref(false)
+const rejectFormRef = ref()
+const rejectTarget = ref(null)
+const rejecting = ref(false)
+const rejectForm = reactive({ note: '' })
+const rejectRules = {
+  note: [{ required: true, message: 'A rejection note is required', trigger: 'blur' }],
+}
+
+async function loadPendingRequests() {
+  loadingPending.value = true
+  try {
+    pendingRequests.value = await http.get('/procurement/material-requests', {
+      params: { status: 'SUBMITTED' },
+    })
+  } finally {
+    loadingPending.value = false
+  }
+}
+
+async function approve(row) {
+  approvingId.value = row.id
+  try {
+    await http.post(`/procurement/material-requests/${row.id}/approve`)
+    ElMessage.success('Material request approved.')
+    // Move the row from Pending to Approved locally instead of re-fetching both
+    // lists — the columns both tables display (requesterName/justification/
+    // requestDate) don't change on approval, so no network round-trip is needed.
+    pendingRequests.value = pendingRequests.value.filter((r) => r.id !== row.id)
+    approvedRequests.value = [...approvedRequests.value, row]
+  } catch {
+    // interceptor already showed the error toast
+  } finally {
+    approvingId.value = null
+  }
+}
+
+function openRejectDialog(row) {
+  rejectTarget.value = row
+  rejectForm.note = ''
+  rejectDialogVisible.value = true
+}
+
+async function submitReject() {
+  const valid = await rejectFormRef.value.validate().catch(() => false)
+  if (!valid) return
+
+  rejecting.value = true
+  try {
+    await http.post(`/procurement/material-requests/${rejectTarget.value.id}/reject`, {
+      note: rejectForm.note,
+    })
+    ElMessage.success('Material request rejected.')
+    rejectDialogVisible.value = false
+    // Rejected requests just drop off the Pending list — no re-fetch needed.
+    pendingRequests.value = pendingRequests.value.filter((r) => r.id !== rejectTarget.value.id)
+  } catch {
+    // interceptor already showed the error toast
+  } finally {
+    rejecting.value = false
+  }
+}
+
+// ---- Tab 3: Approved Requests -> Generate PO ----
 const approvedRequests = ref([])
 const loadingApproved = ref(false)
 const poDialogVisible = ref(false)
@@ -105,6 +177,9 @@ function formatDate(value) {
 
 onMounted(() => {
   loadItems()
+  if (canApprove.value) {
+    loadPendingRequests()
+  }
   if (isAdmin.value) {
     loadApprovedRequests()
   }
@@ -157,6 +232,33 @@ onMounted(() => {
       </el-card>
     </el-tab-pane>
 
+    <el-tab-pane v-if="canApprove" label="Pending Approval" name="pending">
+      <div class="toolbar">
+        <h3>Pending Material Requests</h3>
+        <el-button :loading="loadingPending" @click="loadPendingRequests">Refresh</el-button>
+      </div>
+
+      <el-table v-loading="loadingPending" :data="pendingRequests" stripe border>
+        <el-table-column prop="id" label="MR ID" width="90" />
+        <el-table-column prop="requesterName" label="Requester" min-width="160" />
+        <el-table-column prop="justification" label="Justification" min-width="220" show-overflow-tooltip />
+        <el-table-column label="Requested On" width="180">
+          <template #default="{ row }">{{ formatDate(row.requestDate) }}</template>
+        </el-table-column>
+        <el-table-column label="Actions" width="220" fixed="right">
+          <template #default="{ row }">
+            <el-button type="success" size="small" :loading="approvingId === row.id" @click="approve(row)">
+              Approve
+            </el-button>
+            <el-button type="danger" size="small" @click="openRejectDialog(row)">Reject</el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <el-empty description="No pending requests" />
+        </template>
+      </el-table>
+    </el-tab-pane>
+
     <el-tab-pane v-if="isAdmin" label="Approved Requests" name="approved">
       <div class="toolbar">
         <h3>Approved Material Requests</h3>
@@ -181,6 +283,23 @@ onMounted(() => {
       </el-table>
     </el-tab-pane>
   </el-tabs>
+
+  <el-dialog v-model="rejectDialogVisible" title="Reject Material Request" width="420px">
+    <el-form ref="rejectFormRef" :model="rejectForm" :rules="rejectRules" label-position="top">
+      <el-form-item label="Rejection Note" prop="note">
+        <el-input
+          v-model="rejectForm.note"
+          type="textarea"
+          :rows="3"
+          placeholder="Explain why this request is rejected"
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="rejectDialogVisible = false">Cancel</el-button>
+      <el-button type="danger" :loading="rejecting" @click="submitReject">Reject</el-button>
+    </template>
+  </el-dialog>
 
   <el-dialog v-model="poDialogVisible" title="Generate Purchase Order" width="420px">
     <el-form ref="poFormRef" :model="poForm" :rules="poRules" label-position="top">

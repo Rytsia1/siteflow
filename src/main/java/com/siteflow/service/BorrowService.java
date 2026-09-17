@@ -49,6 +49,10 @@ public class BorrowService {
     @Transactional
     public BorrowRequest createBorrowRequest(Long userId, Long locationId, List<BorrowItemRequest> items) {
         for (BorrowItemRequest request : items) {
+            if (request.qty() <= 0) {
+                throw new IllegalArgumentException(
+                        "Requested quantity must be positive for item " + request.itemId());
+            }
             ItemStock stock = itemStockMapper.findByItemIdAndLocationId(request.itemId(), locationId);
             if (stock == null || stock.getCurrentQty() < request.qty()) {
                 throw new IllegalStateException(
@@ -60,7 +64,7 @@ public class BorrowService {
                 .userId(userId)
                 .locationId(locationId)
                 .requestDate(LocalDateTime.now())
-                .status(BorrowStatus.BORROWED)
+                .status(BorrowStatus.PENDING)
                 .approvalStatus(ApprovalStatus.PENDING_APPROVAL)
                 .build();
         borrowRequestMapper.insert(borrowRequest);
@@ -110,6 +114,15 @@ public class BorrowService {
             throw new IllegalArgumentException("Return quantity must be positive for borrow item " + borrowItemId);
         }
 
+        BorrowRequest borrowRequest = borrowRequestMapper.findById(borrowItem.getBorrowRequestId());
+        if (borrowRequest == null) {
+            throw new ResourceNotFoundException("Borrow request not found: " + borrowItem.getBorrowRequestId());
+        }
+        if (borrowRequest.getStatus() != BorrowStatus.BORROWED && borrowRequest.getStatus() != BorrowStatus.PARTIAL_RETURN) {
+            throw new IllegalStateException("Cannot process return for request " + borrowRequest.getId()
+                    + " with status: " + borrowRequest.getStatus() + ". Must be BORROWED or PARTIAL_RETURN.");
+        }
+
         LocalDateTime now = LocalDateTime.now();
         // Atomically guarded: matches zero rows if this would push qty_returned past qty_borrowed,
         // whether because the line was already fully returned or another request raced this one.
@@ -119,7 +132,6 @@ public class BorrowService {
                     + " exceeds the outstanding balance.");
         }
 
-        BorrowRequest borrowRequest = borrowRequestMapper.findById(borrowItem.getBorrowRequestId());
         ItemStock stock = itemStockMapper.findByItemIdAndLocationId(borrowItem.getItemId(),
                 borrowRequest.getLocationId());
         itemStockMapper.adjustQty(stock.getId(), qtyReturned);

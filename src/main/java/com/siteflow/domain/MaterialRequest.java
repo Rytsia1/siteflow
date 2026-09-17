@@ -19,6 +19,8 @@ public class MaterialRequest {
     private LocalDateTime requestDate;
     private MaterialRequestStatus status;
     private String justification;
+    private Long approvedBy;
+    private String approvalNote;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

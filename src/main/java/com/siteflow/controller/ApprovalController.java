@@ -15,9 +15,9 @@ import com.siteflow.domain.BorrowRequest;
 import com.siteflow.security.UserPrincipal;
 import com.siteflow.service.ApprovalService;
 import com.siteflow.web.ApiResponse;
-import com.siteflow.web.dto.ApproveBorrowRequestDto;
+import com.siteflow.web.dto.ApproveRequestDto;
 import com.siteflow.web.dto.BorrowRequestView;
-import com.siteflow.web.dto.RejectBorrowRequestDto;
+import com.siteflow.web.dto.RejectRequestDto;
 
 @RestController
 @RequestMapping("/api/approvals/borrow-requests")
@@ -47,10 +47,10 @@ public class ApprovalController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<BorrowRequest> approveBorrowRequest(
             @PathVariable Long id,
-            @RequestBody(required = false) ApproveBorrowRequestDto dto,
+            @RequestBody(required = false) ApproveRequestDto dto,
             @AuthenticationPrincipal UserPrincipal principal) {
-        String note = (dto != null) ? dto.note() : null;
-        BorrowRequest approved = approvalService.approveBorrowRequest(id, principal.getUserId(), note);
+        BorrowRequest approved = approvalService.approveBorrowRequest(
+                id, principal.getUserId(), ApproveRequestDto.noteOf(dto));
         return ApiResponse.success("Borrow request approved.", approved);
     }
 
@@ -62,7 +62,7 @@ public class ApprovalController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<BorrowRequest> rejectBorrowRequest(
             @PathVariable Long id,
-            @RequestBody(required = false) RejectBorrowRequestDto dto,
+            @RequestBody(required = false) RejectRequestDto dto,
             @AuthenticationPrincipal UserPrincipal principal) {
         String note = (dto != null) ? dto.note() : null;
         BorrowRequest rejected = approvalService.rejectBorrowRequest(id, principal.getUserId(), note);

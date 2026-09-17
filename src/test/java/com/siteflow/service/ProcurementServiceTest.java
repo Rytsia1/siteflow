@@ -65,6 +65,101 @@ class ProcurementServiceTest {
     }
 
     @Test
+    @DisplayName("approveMaterialRequest writes the approval and returns the updated MR")
+    void approve_submittedMr_writesApprovalAndReturnsUpdated() {
+        MaterialRequest submitted = MaterialRequest.builder().id(1L).status(MaterialRequestStatus.SUBMITTED).build();
+        MaterialRequest approved = MaterialRequest.builder().id(1L).status(MaterialRequestStatus.APPROVED)
+                .approvedBy(7L).approvalNote("ok").build();
+        when(materialRequestMapper.findById(1L)).thenReturn(submitted, approved);
+        when(materialRequestMapper.updateApproval(1L, MaterialRequestStatus.SUBMITTED, MaterialRequestStatus.APPROVED,
+                7L, "ok")).thenReturn(1);
+
+        MaterialRequest result = procurementService.approveMaterialRequest(1L, 7L, "ok");
+
+        assertThat(result.getStatus()).isEqualTo(MaterialRequestStatus.APPROVED);
+        verify(materialRequestMapper).updateApproval(1L, MaterialRequestStatus.SUBMITTED,
+                MaterialRequestStatus.APPROVED, 7L, "ok");
+    }
+
+    @Test
+    @DisplayName("approveMaterialRequest fails with 404-mapped exception when the MR id doesn't exist")
+    void approve_unknownMr_throwsResourceNotFound() {
+        when(materialRequestMapper.findById(404L)).thenReturn(null);
+
+        assertThatThrownBy(() -> procurementService.approveMaterialRequest(404L, 7L, null))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(materialRequestMapper, never()).updateApproval(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("approveMaterialRequest fails without writing when the MR isn't SUBMITTED (already decided)")
+    void approve_alreadyApproved_throwsWithoutWriting() {
+        MaterialRequest approved = MaterialRequest.builder().id(1L).status(MaterialRequestStatus.APPROVED).build();
+        when(materialRequestMapper.findById(1L)).thenReturn(approved);
+
+        assertThatThrownBy(() -> procurementService.approveMaterialRequest(1L, 7L, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("must be SUBMITTED");
+
+        verify(materialRequestMapper, never()).updateApproval(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("approveMaterialRequest fails when a concurrent decision already actioned the MR")
+    void approve_concurrentlyActioned_throws() {
+        MaterialRequest submitted = MaterialRequest.builder().id(1L).status(MaterialRequestStatus.SUBMITTED).build();
+        when(materialRequestMapper.findById(1L)).thenReturn(submitted);
+        when(materialRequestMapper.updateApproval(1L, MaterialRequestStatus.SUBMITTED, MaterialRequestStatus.APPROVED,
+                7L, null)).thenReturn(0);
+
+        assertThatThrownBy(() -> procurementService.approveMaterialRequest(1L, 7L, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("concurrently modified");
+    }
+
+    @Test
+    @DisplayName("rejectMaterialRequest writes REJECTED with the admin id and note")
+    void reject_submittedMr_writesRejected() {
+        MaterialRequest submitted = MaterialRequest.builder().id(1L).status(MaterialRequestStatus.SUBMITTED).build();
+        MaterialRequest rejected = MaterialRequest.builder().id(1L).status(MaterialRequestStatus.REJECTED).build();
+        when(materialRequestMapper.findById(1L)).thenReturn(submitted, rejected);
+        when(materialRequestMapper.updateApproval(1L, MaterialRequestStatus.SUBMITTED, MaterialRequestStatus.REJECTED,
+                7L, "out of budget")).thenReturn(1);
+
+        MaterialRequest result = procurementService.rejectMaterialRequest(1L, 7L, "out of budget");
+
+        assertThat(result.getStatus()).isEqualTo(MaterialRequestStatus.REJECTED);
+        verify(materialRequestMapper).updateApproval(1L, MaterialRequestStatus.SUBMITTED,
+                MaterialRequestStatus.REJECTED, 7L, "out of budget");
+    }
+
+    @Test
+    @DisplayName("rejectMaterialRequest fails without writing when the MR was already rejected (terminal)")
+    void reject_alreadyRejected_throwsWithoutWriting() {
+        MaterialRequest rejected = MaterialRequest.builder().id(1L).status(MaterialRequestStatus.REJECTED).build();
+        when(materialRequestMapper.findById(1L)).thenReturn(rejected);
+
+        assertThatThrownBy(() -> procurementService.rejectMaterialRequest(1L, 7L, "note"))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(materialRequestMapper, never()).updateApproval(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("generatePurchaseOrder fails for a rejected request without creating a PO")
+    void generatePo_rejectedMr_throwsWithoutCreatingPo() {
+        MaterialRequest rejected = MaterialRequest.builder().id(1L).status(MaterialRequestStatus.REJECTED).build();
+        when(materialRequestMapper.findById(1L)).thenReturn(rejected);
+
+        assertThatThrownBy(() -> procurementService.generatePurchaseOrder(1L, "Acme", null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("must be APPROVED");
+
+        verify(purchaseOrderMapper, never()).insert(any());
+    }
+
+    @Test
     @DisplayName("generatePurchaseOrder succeeds for an APPROVED request and moves it to PO_CREATED")
     void generatePo_approvedMr_succeeds() {
         MaterialRequest approved = MaterialRequest.builder().id(1L).status(MaterialRequestStatus.APPROVED).build();
