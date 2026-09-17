@@ -19,8 +19,6 @@ import com.siteflow.web.dto.ApproveBorrowRequestDto;
 import com.siteflow.web.dto.BorrowRequestView;
 import com.siteflow.web.dto.RejectBorrowRequestDto;
 
-import jakarta.validation.Valid;
-
 @RestController
 @RequestMapping("/api/approvals/borrow-requests")
 public class ApprovalController {
@@ -64,9 +62,10 @@ public class ApprovalController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<BorrowRequest> rejectBorrowRequest(
             @PathVariable Long id,
-            @RequestBody @Valid RejectBorrowRequestDto dto,
+            @RequestBody(required = false) RejectBorrowRequestDto dto,
             @AuthenticationPrincipal UserPrincipal principal) {
-        BorrowRequest rejected = approvalService.rejectBorrowRequest(id, principal.getUserId(), dto.note());
+        String note = (dto != null) ? dto.note() : null;
+        BorrowRequest rejected = approvalService.rejectBorrowRequest(id, principal.getUserId(), note);
         return ApiResponse.success("Borrow request rejected.", rejected);
     }
 }
