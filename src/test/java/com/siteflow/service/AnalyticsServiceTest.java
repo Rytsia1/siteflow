@@ -21,6 +21,7 @@ import com.siteflow.mapper.AnalyticsMapper;
 import com.siteflow.web.dto.ConsumptionTrendView;
 import com.siteflow.web.dto.DashboardSummaryView;
 import com.siteflow.web.dto.DemandForecastView;
+import com.siteflow.web.dto.ItemMonthlyConsumptionView;
 import com.siteflow.web.dto.ItemSummaryView;
 import com.siteflow.web.dto.MonthlyConsumptionView;
 import com.siteflow.web.dto.MostBorrowedItemView;
@@ -43,9 +44,8 @@ class AnalyticsServiceTest {
     @Test
     @DisplayName("getDashboardSummary calculates active borrows, low stock items, and top borrowed item")
     void getDashboardSummary_withTopBorrowed_returnsSummary() {
-        ItemSummaryView lowStock = new ItemSummaryView(1L, "DRL-001", "Drill", ItemCategory.TOOL, "units", 1, 5);
         when(analyticsMapper.countActiveBorrows()).thenReturn(4);
-        when(analyticsMapper.findLowStockItems()).thenReturn(List.of(lowStock));
+        when(analyticsMapper.countLowStockItems()).thenReturn(1);
         when(analyticsMapper.findMostBorrowedItemForPeriod(any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(new MostBorrowedItemView(1L, "Drill", 15));
 
@@ -54,13 +54,14 @@ class AnalyticsServiceTest {
         assertThat(summary.totalActiveBorrows()).isEqualTo(4);
         assertThat(summary.totalItemsBelowMinStock()).isEqualTo(1);
         assertThat(summary.mostBorrowedItemName()).isEqualTo("Drill");
+        verify(analyticsMapper).countLowStockItems();
     }
 
     @Test
     @DisplayName("getDashboardSummary handles case when no items were borrowed in period")
     void getDashboardSummary_noBorrowsInPeriod_returnsNullItemName() {
         when(analyticsMapper.countActiveBorrows()).thenReturn(0);
-        when(analyticsMapper.findLowStockItems()).thenReturn(List.of());
+        when(analyticsMapper.countLowStockItems()).thenReturn(0);
         when(analyticsMapper.findMostBorrowedItemForPeriod(any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(null);
 
@@ -110,16 +111,16 @@ class AnalyticsServiceTest {
     }
 
     @Test
-    @DisplayName("generateReorderRecommendations calculates shortfall plus consumption buffer")
+    @DisplayName("generateReorderRecommendations calculates shortfall plus consumption buffer using batch query")
     void generateReorderRecommendations_computesShortfallAndBuffer() {
         ItemSummaryView item = new ItemSummaryView(1L, "DRL-001", "Hammer Drill", ItemCategory.TOOL, "units", 10, 2);
         when(analyticsMapper.findLowStockItems()).thenReturn(List.of(item));
         // 3 recent months consumption: 6, 8, 4 -> average = 6.0 -> buffer = ceil(6.0) = 6
         // Shortfall = 10 - 2 = 8. Recommended = 8 + 6 = 14.
-        when(analyticsMapper.findMonthlyConsumptionByItem(1L)).thenReturn(List.of(
-                new MonthlyConsumptionView("2026-08", 6),
-                new MonthlyConsumptionView("2026-07", 8),
-                new MonthlyConsumptionView("2026-06", 4)
+        when(analyticsMapper.findRecentMonthlyConsumptionForItems(any(), any())).thenReturn(List.of(
+                new ItemMonthlyConsumptionView(1L, "2026-08", 6),
+                new ItemMonthlyConsumptionView(1L, "2026-07", 8),
+                new ItemMonthlyConsumptionView(1L, "2026-06", 4)
         ));
 
         List<ReorderRecommendationView> recommendations = analyticsService.generateReorderRecommendations();
@@ -138,7 +139,7 @@ class AnalyticsServiceTest {
     void generateReorderRecommendations_noConsumptionHistory_recommendsJustShortfall() {
         ItemSummaryView item = new ItemSummaryView(1L, "DRL-001", "Hammer Drill", ItemCategory.TOOL, "units", 10, 3);
         when(analyticsMapper.findLowStockItems()).thenReturn(List.of(item));
-        when(analyticsMapper.findMonthlyConsumptionByItem(1L)).thenReturn(List.of());
+        when(analyticsMapper.findRecentMonthlyConsumptionForItems(any(), any())).thenReturn(List.of());
 
         List<ReorderRecommendationView> recommendations = analyticsService.generateReorderRecommendations();
 

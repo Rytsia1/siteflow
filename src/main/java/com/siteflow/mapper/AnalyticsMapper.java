@@ -11,6 +11,7 @@ import org.apache.ibatis.annotations.Select;
 
 import com.siteflow.domain.enums.ItemCategory;
 import com.siteflow.web.dto.ConsumptionTrendView;
+import com.siteflow.web.dto.ItemMonthlyConsumptionView;
 import com.siteflow.web.dto.ItemSummaryView;
 import com.siteflow.web.dto.MonthlyConsumptionView;
 import com.siteflow.web.dto.MostBorrowedItemView;
@@ -39,6 +40,18 @@ public interface AnalyticsMapper {
     List<ItemSummaryView> findLowStockItems();
 
     /**
+     * Efficient scalar count of items currently at or below their reorder threshold.
+     * Avoids loading all low-stock item entities and materializing DTOs just for dashboard counters.
+     */
+    @Select("SELECT COUNT(*) FROM ("
+            + "  SELECT i.id "
+            + "  FROM items i LEFT JOIN item_stocks s ON s.item_id = i.id "
+            + "  GROUP BY i.id, i.min_stock_threshold "
+            + "  HAVING COALESCE(SUM(s.current_qty), 0) <= i.min_stock_threshold"
+            + ") AS low_stock")
+    int countLowStockItems();
+
+    /**
      * Monthly outflow of consumable items (borrowed quantity) within the given date range,
      * derived from the signed qty_change already recorded on BORROW transaction logs.
      */
@@ -55,13 +68,24 @@ public interface AnalyticsMapper {
     /**
      * Per-tool-item ratio of physical instances currently out on a non-completed borrow
      * versus the total number of physical instances owned.
+     * Optimized using pre-aggregated LEFT JOINs instead of correlated subqueries.
      */
     @Select("SELECT i.id AS item_id, i.name AS item_name, "
-            + "(SELECT COUNT(*) FROM item_instances ii WHERE ii.item_id = i.id) AS total_owned, "
-            + "(SELECT COALESCE(SUM(bi.qty_borrowed - bi.qty_returned), 0) "
-            + "   FROM borrow_items bi JOIN borrow_requests br ON br.id = bi.borrow_request_id "
-            + "   WHERE bi.item_id = i.id AND br.status <> 'COMPLETED') AS currently_out "
+            + "COALESCE(inst.total_owned, 0) AS total_owned, "
+            + "COALESCE(act.currently_out, 0) AS currently_out "
             + "FROM items i "
+            + "LEFT JOIN ("
+            + "  SELECT item_id, COUNT(*) AS total_owned "
+            + "  FROM item_instances "
+            + "  GROUP BY item_id"
+            + ") inst ON inst.item_id = i.id "
+            + "LEFT JOIN ("
+            + "  SELECT bi.item_id, SUM(bi.qty_borrowed - bi.qty_returned) AS currently_out "
+            + "  FROM borrow_items bi "
+            + "  JOIN borrow_requests br ON br.id = bi.borrow_request_id "
+            + "  WHERE br.status <> 'COMPLETED' "
+            + "  GROUP BY bi.item_id"
+            + ") act ON act.item_id = i.id "
             + "WHERE i.category = 'TOOL' "
             + "ORDER BY i.id")
     List<ToolUtilizationView> findToolUtilization();
@@ -89,4 +113,24 @@ public interface AnalyticsMapper {
             + "ORDER BY period DESC "
             + "LIMIT 6")
     List<MonthlyConsumptionView> findMonthlyConsumptionByItem(@Param("itemId") Long itemId);
+
+    /**
+     * Batch lookup of borrowed quantity per month for multiple items, ordered most recent first.
+     * Eliminates N+1 query execution when generating reorder recommendations.
+     */
+    @Select("<script>"
+            + "SELECT item_id AS itemId, DATE_FORMAT(timestamp, '%Y-%m') AS period, SUM(-qty_change) AS qty "
+            + "FROM transaction_logs "
+            + "WHERE transaction_type = 'BORROW' "
+            + "AND item_id IN "
+            + "<foreach item='id' collection='itemIds' open='(' separator=',' close=')'>#{id}</foreach> "
+            + "<if test='since != null'>"
+            + "AND timestamp &gt;= #{since} "
+            + "</if>"
+            + "GROUP BY item_id, period "
+            + "ORDER BY item_id, period DESC"
+            + "</script>")
+    List<ItemMonthlyConsumptionView> findRecentMonthlyConsumptionForItems(
+            @Param("itemIds") List<Long> itemIds,
+            @Param("since") LocalDateTime since);
 }

@@ -46,9 +46,26 @@ public class ProcurementController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PROCUREMENT')")
     public ApiResponse<List<MaterialRequestView>> listMaterialRequests(
-            @RequestParam MaterialRequestStatus status) {
-        return ApiResponse.success("Material requests retrieved.",
-                procurementService.listMaterialRequestsByStatus(status));
+            @RequestParam MaterialRequestStatus status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            jakarta.servlet.http.HttpServletResponse response) {
+        if (page == null && size == null) {
+            return ApiResponse.success("Material requests retrieved.",
+                    procurementService.listMaterialRequestsByStatus(status));
+        }
+        int pageIndex = (page != null) ? page : 0;
+        int pageSize = (size != null) ? size : 20;
+        List<MaterialRequestView> requests = procurementService.listMaterialRequestsByStatus(status, pageIndex, pageSize);
+        int total = procurementService.countMaterialRequestsByStatus(status);
+        int totalPages = (int) Math.ceil((double) total / pageSize);
+        if (response != null) {
+            response.setHeader("X-Total-Count", String.valueOf(total));
+            response.setHeader("X-Page-Number", String.valueOf(pageIndex));
+            response.setHeader("X-Page-Size", String.valueOf(pageSize));
+            response.setHeader("X-Total-Pages", String.valueOf(totalPages));
+        }
+        return ApiResponse.success("Material requests retrieved.", requests);
     }
 
     /**
@@ -129,8 +146,26 @@ public class ProcurementController {
 
     @GetMapping("/my")
     @PreAuthorize("hasAnyRole('ADMIN', 'FIELD_STAFF', 'WAREHOUSE_STAFF')")
-    public ApiResponse<List<MaterialRequest>> listMyMaterialRequests(@AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Material requests retrieved.", procurementService.listMyMaterialRequests(principal.getUserId()));
+    public ApiResponse<List<MaterialRequest>> listMyMaterialRequests(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @AuthenticationPrincipal UserPrincipal principal,
+            jakarta.servlet.http.HttpServletResponse response) {
+        if (page == null && size == null) {
+            return ApiResponse.success("Material requests retrieved.", procurementService.listMyMaterialRequests(principal.getUserId()));
+        }
+        int pageIndex = (page != null) ? page : 0;
+        int pageSize = (size != null) ? size : 20;
+        List<MaterialRequest> requests = procurementService.listMyMaterialRequests(principal.getUserId(), pageIndex, pageSize);
+        int total = procurementService.countMyMaterialRequests(principal.getUserId());
+        int totalPages = (int) Math.ceil((double) total / pageSize);
+        if (response != null) {
+            response.setHeader("X-Total-Count", String.valueOf(total));
+            response.setHeader("X-Page-Number", String.valueOf(pageIndex));
+            response.setHeader("X-Page-Size", String.valueOf(pageSize));
+            response.setHeader("X-Total-Pages", String.valueOf(totalPages));
+        }
+        return ApiResponse.success("Material requests retrieved.", requests);
     }
 
     @PostMapping("/{id}/cancel")

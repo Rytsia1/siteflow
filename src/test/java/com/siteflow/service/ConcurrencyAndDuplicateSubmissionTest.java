@@ -82,9 +82,13 @@ class ConcurrencyAndDuplicateSubmissionTest {
         return new UserPrincipal(3L, "pekerja", "hash", "FIELD_STAFF");
     }
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void cleanIdempotencyKeys() {
         idempotencyKeyMapper.deleteAll();
+        jdbcTemplate.update("UPDATE item_stocks SET current_qty = 100 WHERE item_id = 1 AND location_id = 1");
     }
 
     @Test

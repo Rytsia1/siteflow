@@ -192,6 +192,28 @@ public class ProcurementService {
         return materialRequestMapper.findByStatusWithDetails(status);
     }
 
+    @Transactional(readOnly = true)
+    public List<MaterialRequestView> listMaterialRequestsByStatus(MaterialRequestStatus status, Integer page, Integer size) {
+        int pageIndex = (page != null) ? page : 0;
+        int pageSize = (size != null) ? size : 20;
+        if (pageIndex < 0) {
+            throw new IllegalArgumentException("Page index must not be negative.");
+        }
+        if (pageSize < 1) {
+            throw new IllegalArgumentException("Page size must be at least 1.");
+        }
+        if (pageSize > 100) {
+            throw new IllegalArgumentException("Page size must not exceed 100.");
+        }
+        int offset = pageIndex * pageSize;
+        return materialRequestMapper.findByStatusWithDetailsPaged(status, offset, pageSize);
+    }
+
+    @Transactional(readOnly = true)
+    public int countMaterialRequestsByStatus(MaterialRequestStatus status) {
+        return materialRequestMapper.countByStatus(status);
+    }
+
     /**
      * Retrieves a material request by ID with resource-level authorization.
      * ADMIN and PROCUREMENT can inspect any MR; FIELD_STAFF and WAREHOUSE_STAFF can only view their own.
@@ -225,6 +247,28 @@ public class ProcurementService {
     @Transactional(readOnly = true)
     public List<MaterialRequest> listMyMaterialRequests(Long userId) {
         return materialRequestMapper.findByRequestedBy(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MaterialRequest> listMyMaterialRequests(Long userId, Integer page, Integer size) {
+        int pageIndex = (page != null) ? page : 0;
+        int pageSize = (size != null) ? size : 20;
+        if (pageIndex < 0) {
+            throw new IllegalArgumentException("Page index must not be negative.");
+        }
+        if (pageSize < 1) {
+            throw new IllegalArgumentException("Page size must be at least 1.");
+        }
+        if (pageSize > 100) {
+            throw new IllegalArgumentException("Page size must not exceed 100.");
+        }
+        int offset = pageIndex * pageSize;
+        return materialRequestMapper.findByRequestedByPaged(userId, offset, pageSize);
+    }
+
+    @Transactional(readOnly = true)
+    public int countMyMaterialRequests(Long userId) {
+        return materialRequestMapper.countByRequestedBy(userId);
     }
 
     /**

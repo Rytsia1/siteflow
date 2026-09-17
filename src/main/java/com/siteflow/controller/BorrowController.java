@@ -70,8 +70,26 @@ public class BorrowController {
 
     @GetMapping("/my")
     @PreAuthorize("hasAnyRole('ADMIN', 'FIELD_STAFF')")
-    public ApiResponse<List<BorrowRequest>> listMyBorrowRequests(@AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Borrow requests retrieved.", borrowService.listUserBorrowRequests(principal.getUserId()));
+    public ApiResponse<List<BorrowRequest>> listMyBorrowRequests(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size,
+            @AuthenticationPrincipal UserPrincipal principal,
+            jakarta.servlet.http.HttpServletResponse response) {
+        if (page == null && size == null) {
+            return ApiResponse.success("Borrow requests retrieved.", borrowService.listUserBorrowRequests(principal.getUserId()));
+        }
+        int pageIndex = (page != null) ? page : 0;
+        int pageSize = (size != null) ? size : 20;
+        List<BorrowRequest> requests = borrowService.listUserBorrowRequests(principal.getUserId(), pageIndex, pageSize);
+        int total = borrowService.countUserBorrowRequests(principal.getUserId());
+        int totalPages = (int) Math.ceil((double) total / pageSize);
+        if (response != null) {
+            response.setHeader("X-Total-Count", String.valueOf(total));
+            response.setHeader("X-Page-Number", String.valueOf(pageIndex));
+            response.setHeader("X-Page-Size", String.valueOf(pageSize));
+            response.setHeader("X-Total-Pages", String.valueOf(totalPages));
+        }
+        return ApiResponse.success("Borrow requests retrieved.", requests);
     }
 
     @PostMapping("/{id}/cancel")

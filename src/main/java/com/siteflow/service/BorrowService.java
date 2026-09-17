@@ -240,6 +240,28 @@ public class BorrowService {
         return borrowRequestMapper.findByUserId(userId);
     }
 
+    @Transactional(readOnly = true)
+    public List<BorrowRequest> listUserBorrowRequests(Long userId, Integer page, Integer size) {
+        int pageIndex = (page != null) ? page : 0;
+        int pageSize = (size != null) ? size : 20;
+        if (pageIndex < 0) {
+            throw new IllegalArgumentException("Page index must not be negative.");
+        }
+        if (pageSize < 1) {
+            throw new IllegalArgumentException("Page size must be at least 1.");
+        }
+        if (pageSize > 100) {
+            throw new IllegalArgumentException("Page size must not exceed 100.");
+        }
+        int offset = pageIndex * pageSize;
+        return borrowRequestMapper.findByUserIdPaged(userId, offset, pageSize);
+    }
+
+    @Transactional(readOnly = true)
+    public int countUserBorrowRequests(Long userId) {
+        return borrowRequestMapper.countByUserId(userId);
+    }
+
     /**
      * Processes every return line against a single borrow request in one transaction. Every
      * line is verified to belong to the request before any of them are applied, so a bad line

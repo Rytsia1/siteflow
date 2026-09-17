@@ -81,6 +81,28 @@ public class ApprovalService {
         return borrowRequestMapper.findByApprovalStatusWithDetails(ApprovalStatus.PENDING_APPROVAL);
     }
 
+    @Transactional(readOnly = true)
+    public List<BorrowRequestView> listPendingBorrowRequests(Integer page, Integer size) {
+        int pageIndex = (page != null) ? page : 0;
+        int pageSize = (size != null) ? size : 20;
+        if (pageIndex < 0) {
+            throw new IllegalArgumentException("Page index must not be negative.");
+        }
+        if (pageSize < 1) {
+            throw new IllegalArgumentException("Page size must be at least 1.");
+        }
+        if (pageSize > 100) {
+            throw new IllegalArgumentException("Page size must not exceed 100.");
+        }
+        int offset = pageIndex * pageSize;
+        return borrowRequestMapper.findByApprovalStatusWithDetailsPaged(ApprovalStatus.PENDING_APPROVAL, offset, pageSize);
+    }
+
+    @Transactional(readOnly = true)
+    public int countPendingBorrowRequests() {
+        return borrowRequestMapper.countByApprovalStatus(ApprovalStatus.PENDING_APPROVAL);
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------

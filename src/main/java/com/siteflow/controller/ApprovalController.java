@@ -37,8 +37,25 @@ public class ApprovalController {
      */
     @GetMapping("/pending")
     @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<List<BorrowRequestView>> listPending() {
-        return ApiResponse.success("Pending borrow requests retrieved.", approvalService.listPendingBorrowRequests());
+    public ApiResponse<List<BorrowRequestView>> listPending(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer size,
+            jakarta.servlet.http.HttpServletResponse response) {
+        if (page == null && size == null) {
+            return ApiResponse.success("Pending borrow requests retrieved.", approvalService.listPendingBorrowRequests());
+        }
+        int pageIndex = (page != null) ? page : 0;
+        int pageSize = (size != null) ? size : 20;
+        List<BorrowRequestView> requests = approvalService.listPendingBorrowRequests(pageIndex, pageSize);
+        int total = approvalService.countPendingBorrowRequests();
+        int totalPages = (int) Math.ceil((double) total / pageSize);
+        if (response != null) {
+            response.setHeader("X-Total-Count", String.valueOf(total));
+            response.setHeader("X-Page-Number", String.valueOf(pageIndex));
+            response.setHeader("X-Page-Size", String.valueOf(pageSize));
+            response.setHeader("X-Total-Pages", String.valueOf(totalPages));
+        }
+        return ApiResponse.success("Pending borrow requests retrieved.", requests);
     }
 
     /**

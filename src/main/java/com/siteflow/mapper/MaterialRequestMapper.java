@@ -30,6 +30,12 @@ public interface MaterialRequestMapper {
     @Select("SELECT * FROM material_requests WHERE requested_by = #{userId} ORDER BY request_date DESC")
     List<MaterialRequest> findByRequestedBy(Long userId);
 
+    @Select("SELECT * FROM material_requests WHERE requested_by = #{userId} ORDER BY request_date DESC LIMIT #{limit} OFFSET #{offset}")
+    List<MaterialRequest> findByRequestedByPaged(@Param("userId") Long userId, @Param("offset") int offset, @Param("limit") int limit);
+
+    @Select("SELECT COUNT(*) FROM material_requests WHERE requested_by = #{userId}")
+    int countByRequestedBy(@Param("userId") Long userId);
+
     @Select("SELECT * FROM material_requests WHERE status = #{status} ORDER BY request_date DESC")
     List<MaterialRequest> findByStatus(@Param("status") MaterialRequestStatus status);
 
@@ -78,4 +84,26 @@ public interface MaterialRequestMapper {
             @Arg(column = "status", javaType = MaterialRequestStatus.class)
     })
     List<MaterialRequestView> findByStatusWithDetails(@Param("status") MaterialRequestStatus status);
+
+    @Select("SELECT mr.id AS id, u.full_name AS requester_name, mr.justification AS justification, "
+            + "mr.request_date AS request_date, mr.status AS status "
+            + "FROM material_requests mr "
+            + "JOIN users u ON u.id = mr.requested_by "
+            + "WHERE mr.status = #{status} "
+            + "ORDER BY mr.request_date "
+            + "LIMIT #{limit} OFFSET #{offset}")
+    @ConstructorArgs({
+            @Arg(column = "id", javaType = Long.class),
+            @Arg(column = "requester_name", javaType = String.class),
+            @Arg(column = "justification", javaType = String.class),
+            @Arg(column = "request_date", javaType = LocalDateTime.class),
+            @Arg(column = "status", javaType = MaterialRequestStatus.class)
+    })
+    List<MaterialRequestView> findByStatusWithDetailsPaged(
+            @Param("status") MaterialRequestStatus status,
+            @Param("offset") int offset,
+            @Param("limit") int limit);
+
+    @Select("SELECT COUNT(*) FROM material_requests WHERE status = #{status}")
+    int countByStatus(@Param("status") MaterialRequestStatus status);
 }

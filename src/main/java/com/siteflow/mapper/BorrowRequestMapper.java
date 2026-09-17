@@ -31,6 +31,12 @@ public interface BorrowRequestMapper {
     @Select("SELECT * FROM borrow_requests WHERE user_id = #{userId} ORDER BY request_date DESC")
     List<BorrowRequest> findByUserId(Long userId);
 
+    @Select("SELECT * FROM borrow_requests WHERE user_id = #{userId} ORDER BY request_date DESC LIMIT #{limit} OFFSET #{offset}")
+    List<BorrowRequest> findByUserIdPaged(@Param("userId") Long userId, @Param("offset") int offset, @Param("limit") int limit);
+
+    @Select("SELECT COUNT(*) FROM borrow_requests WHERE user_id = #{userId}")
+    int countByUserId(@Param("userId") Long userId);
+
     @Update("UPDATE borrow_requests SET status = #{status} WHERE id = #{id}")
     int updateStatus(@Param("id") Long id, @Param("status") BorrowStatus status);
 
@@ -75,5 +81,28 @@ public interface BorrowRequestMapper {
             @Arg(column = "approval_status", javaType = ApprovalStatus.class)
     })
     List<BorrowRequestView> findByApprovalStatusWithDetails(@Param("approvalStatus") ApprovalStatus approvalStatus);
-}
 
+    @Select("SELECT br.id AS id, u.full_name AS requester_name, l.location_name AS location_name, "
+            + "br.request_date AS request_date, br.status AS status, br.approval_status AS approval_status "
+            + "FROM borrow_requests br "
+            + "JOIN users u ON u.id = br.user_id "
+            + "JOIN locations l ON l.id = br.location_id "
+            + "WHERE br.approval_status = #{approvalStatus} "
+            + "ORDER BY br.request_date "
+            + "LIMIT #{limit} OFFSET #{offset}")
+    @ConstructorArgs({
+            @Arg(column = "id", javaType = Long.class),
+            @Arg(column = "requester_name", javaType = String.class),
+            @Arg(column = "location_name", javaType = String.class),
+            @Arg(column = "request_date", javaType = LocalDateTime.class),
+            @Arg(column = "status", javaType = BorrowStatus.class),
+            @Arg(column = "approval_status", javaType = ApprovalStatus.class)
+    })
+    List<BorrowRequestView> findByApprovalStatusWithDetailsPaged(
+            @Param("approvalStatus") ApprovalStatus approvalStatus,
+            @Param("offset") int offset,
+            @Param("limit") int limit);
+
+    @Select("SELECT COUNT(*) FROM borrow_requests WHERE approval_status = #{approvalStatus}")
+    int countByApprovalStatus(@Param("approvalStatus") ApprovalStatus approvalStatus);
+}
