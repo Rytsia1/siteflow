@@ -21,6 +21,10 @@ public class UserPrincipal extends User {
     }
 
     private static List<GrantedAuthority> authorities(String roleName) {
-        return List.of(new SimpleGrantedAuthority("ROLE_" + roleName));
+        if (roleName == null || roleName.isBlank()) {
+            return List.of();
+        }
+        String authority = roleName.startsWith("ROLE_") ? roleName : "ROLE_" + roleName;
+        return List.of(new SimpleGrantedAuthority(authority));
     }
 }

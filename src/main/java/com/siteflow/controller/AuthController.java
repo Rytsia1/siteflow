@@ -1,5 +1,6 @@
 package com.siteflow.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -58,6 +59,7 @@ public class AuthController {
      * Identifies the authenticated caller, including role, from the current JWT security context.
      */
     @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<CurrentUserView> me(@AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success("Current user.",
                 new CurrentUserView(principal.getUserId(), principal.getUsername(), principal.getRoleName()));

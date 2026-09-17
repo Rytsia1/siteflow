@@ -24,7 +24,7 @@ public class InventoryController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF', 'FIELD_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF', 'FIELD_STAFF', 'PROCUREMENT')")
     public ApiResponse<List<ItemSummaryView>> listItems() {
         return ApiResponse.success("Items retrieved.", inventoryService.listItems());
     }

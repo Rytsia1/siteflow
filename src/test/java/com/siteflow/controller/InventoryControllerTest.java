@@ -73,6 +73,17 @@ class InventoryControllerTest {
     }
 
     @Test
+    @DisplayName("Procurement role can view item list")
+    void listItems_asProcurement_success() throws Exception {
+        when(inventoryService.listItems()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/items")
+                        .with(user(procurementPrincipal())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"));
+    }
+
+    @Test
     @DisplayName("Warehouse staff can view detailed stock breakdown per location")
     void getStockByItem_asWarehouseStaff_success() throws Exception {
         ItemStockView stock = new ItemStockView(10L, "Main Warehouse", 8);
