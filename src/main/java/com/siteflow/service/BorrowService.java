@@ -149,8 +149,13 @@ public class BorrowService {
         List<BorrowItem> allItems = borrowItemMapper.findByBorrowRequestId(borrowRequest.getId());
         boolean allReturned = allItems.stream()
                 .allMatch(item -> item.getQtyReturned() != null && item.getQtyReturned().equals(item.getQtyBorrowed()));
-        borrowRequestMapper.updateStatus(borrowRequest.getId(),
-                allReturned ? BorrowStatus.COMPLETED : BorrowStatus.PARTIAL_RETURN);
+        BorrowStatus targetStatus = allReturned ? BorrowStatus.COMPLETED : BorrowStatus.PARTIAL_RETURN;
+        if (!borrowRequest.getStatus().canTransitionTo(targetStatus)) {
+            throw new IllegalStateException(
+                    "Cannot transition borrow request " + borrowRequest.getId()
+                    + " from " + borrowRequest.getStatus() + " to " + targetStatus);
+        }
+        borrowRequestMapper.updateStatus(borrowRequest.getId(), targetStatus);
     }
 
     /**
@@ -160,6 +165,19 @@ public class BorrowService {
      */
     @Transactional
     public void processReturnsForRequest(Long borrowRequestId, List<ReturnLine> lines, Long userId) {
+        BorrowRequest borrowRequest = borrowRequestMapper.findById(borrowRequestId);
+        if (borrowRequest == null) {
+            throw new ResourceNotFoundException("Borrow request not found: " + borrowRequestId);
+        }
+        if (borrowRequest.getStatus().isTerminal()) {
+            throw new IllegalStateException(
+                    "Cannot process returns for borrow request " + borrowRequestId + " in terminal status: " + borrowRequest.getStatus());
+        }
+        if (borrowRequest.getStatus() != BorrowStatus.BORROWED && borrowRequest.getStatus() != BorrowStatus.PARTIAL_RETURN) {
+            throw new IllegalStateException("Cannot process return for request " + borrowRequestId
+                    + " with status: " + borrowRequest.getStatus() + ". Must be BORROWED or PARTIAL_RETURN.");
+        }
+
         for (ReturnLine line : lines) {
             BorrowItem borrowItem = borrowItemMapper.findById(line.borrowItemId());
             if (borrowItem == null || !borrowItem.getBorrowRequestId().equals(borrowRequestId)) {

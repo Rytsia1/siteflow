@@ -185,7 +185,11 @@ public class ProcurementService {
     public PurchaseOrder generatePurchaseOrder(Long mrId, String supplierName,
                                                LocalDateTime expectedDeliveryDate) {
         // Guard: only APPROVED MRs can be converted to a PO
-        requireMrInStatus(mrId, MaterialRequestStatus.APPROVED);
+        MaterialRequest mr = requireMrInStatus(mrId, MaterialRequestStatus.APPROVED);
+        if (!mr.getStatus().canTransitionTo(MaterialRequestStatus.PO_CREATED)) {
+            throw new IllegalStateException(
+                    "Cannot transition material request from " + mr.getStatus() + " to PO_CREATED");
+        }
 
         // Claim the transition first: APPROVED → PO_CREATED. Only one concurrent caller
         // can win this atomic compare-and-swap, so at most one PO is ever created per MR.
@@ -222,11 +226,43 @@ public class ProcurementService {
      */
     @Transactional
     public MaterialRequest markMaterialRequestCompleted(Long mrId) {
-        requireMrInStatus(mrId, MaterialRequestStatus.PO_CREATED);
+        MaterialRequest mr = requireMrInStatus(mrId, MaterialRequestStatus.PO_CREATED);
+        if (!mr.getStatus().canTransitionTo(MaterialRequestStatus.COMPLETED)) {
+            throw new IllegalStateException(
+                    "Cannot transition material request from " + mr.getStatus() + " to COMPLETED");
+        }
 
         // Transition: PO_CREATED → COMPLETED — procurement cycle is closed
         updateMrStatusOrThrow(mrId, MaterialRequestStatus.PO_CREATED, MaterialRequestStatus.COMPLETED);
         return materialRequestMapper.findById(mrId);
+    }
+
+    /**
+     * Transitions a Purchase Order through its lifecycle:
+     * ISSUED → PARTIAL_RECEIVED → FULFILLED.
+     * Rejects invalid transitions, terminal modifications, and concurrent race conditions.
+     */
+    @Transactional
+    public PurchaseOrder updatePurchaseOrderStatus(Long poId, PurchaseOrderStatus newStatus) {
+        PurchaseOrder po = purchaseOrderMapper.findById(poId);
+        if (po == null) {
+            throw new ResourceNotFoundException("Purchase order not found: " + poId);
+        }
+        if (po.getPoStatus().isTerminal()) {
+            throw new IllegalStateException(
+                    "Cannot modify purchase order " + poId + " in terminal status: " + po.getPoStatus());
+        }
+        if (!po.getPoStatus().canTransitionTo(newStatus)) {
+            throw new IllegalStateException(
+                    "Cannot transition purchase order from " + po.getPoStatus() + " to " + newStatus);
+        }
+
+        int updated = purchaseOrderMapper.updateStatusGuarded(poId, po.getPoStatus(), newStatus);
+        if (updated == 0) {
+            throw new IllegalStateException(
+                    "Purchase order " + poId + " was concurrently modified and is no longer " + po.getPoStatus() + ".");
+        }
+        return purchaseOrderMapper.findById(poId);
     }
 
     // =========================================================================
@@ -253,7 +289,11 @@ public class ProcurementService {
      * changed between the check and the write.
      */
     private MaterialRequest transitionApproval(Long mrId, Long adminId, String note, MaterialRequestStatus newStatus) {
-        requireMrInStatus(mrId, MaterialRequestStatus.SUBMITTED);
+        MaterialRequest mr = requireMrInStatus(mrId, MaterialRequestStatus.SUBMITTED);
+        if (!mr.getStatus().canTransitionTo(newStatus)) {
+            throw new IllegalStateException(
+                    "Cannot transition material request from " + mr.getStatus() + " to " + newStatus);
+        }
 
         int updated = materialRequestMapper.updateApproval(
                 mrId, MaterialRequestStatus.SUBMITTED, newStatus, adminId, note);

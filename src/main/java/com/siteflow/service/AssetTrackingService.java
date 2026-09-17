@@ -110,9 +110,15 @@ public class AssetTrackingService {
         }
 
         // Validate request lifecycle state
-        if (borrowRequest.getStatus() == BorrowStatus.COMPLETED) {
+        if (borrowRequest.getStatus().isTerminal()) {
             throw new IllegalStateException(
-                    "Borrow request " + borrowRequestId + " is already completed. Tool checkout is not allowed.");
+                    "Borrow request " + borrowRequestId + " is already completed (terminal state "
+                    + borrowRequest.getStatus() + "). Tool checkout is not allowed.");
+        }
+        if (borrowRequest.getStatus() != BorrowStatus.PENDING && borrowRequest.getStatus() != BorrowStatus.BORROWED) {
+            throw new IllegalStateException(
+                    "Borrow request " + borrowRequestId + " cannot check out tools with status: "
+                    + borrowRequest.getStatus() + ". Must be PENDING or BORROWED.");
         }
 
         // 4. Validate that this tool item belongs to the borrow request
@@ -138,6 +144,11 @@ public class AssetTrackingService {
 
         // 6. Transition request status to BORROWED if it was still PENDING
         if (borrowRequest.getStatus() == BorrowStatus.PENDING) {
+            if (!borrowRequest.getStatus().canTransitionTo(BorrowStatus.BORROWED)) {
+                throw new IllegalStateException(
+                        "Cannot transition borrow request " + borrowRequestId + " from "
+                        + borrowRequest.getStatus() + " to BORROWED");
+            }
             borrowRequestMapper.updateStatus(borrowRequestId, BorrowStatus.BORROWED);
         }
 
@@ -219,8 +230,13 @@ public class AssetTrackingService {
                 boolean allReturned = updatedItems != null && !updatedItems.isEmpty() && updatedItems.stream()
                         .allMatch(item -> item.getQtyReturned() != null && item.getQtyReturned().equals(item.getQtyBorrowed()));
 
-                borrowRequestMapper.updateStatus(borrowRequestId,
-                        allReturned ? BorrowStatus.COMPLETED : BorrowStatus.PARTIAL_RETURN);
+                BorrowStatus targetStatus = allReturned ? BorrowStatus.COMPLETED : BorrowStatus.PARTIAL_RETURN;
+                if (!borrowRequest.getStatus().canTransitionTo(targetStatus)) {
+                    throw new IllegalStateException(
+                            "Cannot transition borrow request " + borrowRequestId + " from "
+                            + borrowRequest.getStatus() + " to " + targetStatus);
+                }
+                borrowRequestMapper.updateStatus(borrowRequestId, targetStatus);
             }
         }
 

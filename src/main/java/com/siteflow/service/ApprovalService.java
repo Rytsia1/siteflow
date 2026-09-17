@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.siteflow.domain.BorrowRequest;
 import com.siteflow.domain.enums.ApprovalStatus;
+import com.siteflow.domain.enums.BorrowStatus;
 import com.siteflow.mapper.BorrowRequestMapper;
 import com.siteflow.web.ResourceNotFoundException;
 import com.siteflow.web.dto.BorrowRequestView;
@@ -95,7 +96,15 @@ public class ApprovalService {
      * succeeding, in case the request changed between the check and the write.
      */
     private BorrowRequest transitionApproval(Long requestId, Long adminId, String note, ApprovalStatus newStatus) {
-        requirePendingRequest(requestId);
+        BorrowRequest request = requirePendingRequest(requestId);
+        if (!request.getApprovalStatus().canTransitionTo(newStatus)) {
+            throw new IllegalStateException(
+                    "Cannot transition approval status from " + request.getApprovalStatus() + " to " + newStatus);
+        }
+        if (request.getStatus() == BorrowStatus.COMPLETED) {
+            throw new IllegalStateException(
+                    "Cannot modify borrow request " + requestId + " that is already completed.");
+        }
 
         int updated = borrowRequestMapper.updateApproval(
                 requestId, ApprovalStatus.PENDING_APPROVAL, newStatus, adminId, note);

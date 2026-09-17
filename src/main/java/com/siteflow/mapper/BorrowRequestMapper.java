@@ -31,6 +31,11 @@ public interface BorrowRequestMapper {
     @Update("UPDATE borrow_requests SET status = #{status} WHERE id = #{id}")
     int updateStatus(@Param("id") Long id, @Param("status") BorrowStatus status);
 
+    @Update("UPDATE borrow_requests SET status = #{newStatus} WHERE id = #{id} AND status = #{expectedStatus}")
+    int updateStatusGuarded(@Param("id") Long id,
+                            @Param("expectedStatus") BorrowStatus expectedStatus,
+                            @Param("newStatus") BorrowStatus newStatus);
+
     /**
      * Records an approval decision: sets the approval_status (APPROVED or REJECTED),
      * the id of the admin who decided, and an optional explanatory note, all in one

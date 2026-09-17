@@ -33,4 +33,10 @@ public interface PurchaseOrderMapper {
     /** Transitions the PO between ISSUED → PARTIAL_RECEIVED → FULFILLED. */
     @Update("UPDATE purchase_orders SET po_status = #{status} WHERE id = #{id}")
     int updateStatus(@Param("id") Long id, @Param("status") PurchaseOrderStatus status);
+
+    /** Atomically transitions the PO status guarded by its current expected status. */
+    @Update("UPDATE purchase_orders SET po_status = #{newStatus} WHERE id = #{id} AND po_status = #{expectedStatus}")
+    int updateStatusGuarded(@Param("id") Long id,
+                            @Param("expectedStatus") PurchaseOrderStatus expectedStatus,
+                            @Param("newStatus") PurchaseOrderStatus newStatus);
 }
