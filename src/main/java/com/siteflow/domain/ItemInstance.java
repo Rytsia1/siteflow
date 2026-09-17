@@ -19,6 +19,8 @@ public class ItemInstance {
     private String serialNumber;
     private String qrCodeValue;
     private ToolCondition toolCondition;
+    private Boolean isAvailable;
+    private Long currentBorrowRequestId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

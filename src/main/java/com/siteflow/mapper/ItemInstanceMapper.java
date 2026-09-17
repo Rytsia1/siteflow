@@ -13,8 +13,8 @@ import com.siteflow.domain.enums.ToolCondition;
 @Mapper
 public interface ItemInstanceMapper {
 
-    @Insert("INSERT INTO item_instances (item_id, serial_number, qr_code_value, tool_condition) "
-            + "VALUES (#{itemId}, #{serialNumber}, #{qrCodeValue}, #{toolCondition})")
+    @Insert("INSERT INTO item_instances (item_id, serial_number, qr_code_value, tool_condition, is_available, current_borrow_request_id) "
+            + "VALUES (#{itemId}, #{serialNumber}, #{qrCodeValue}, #{toolCondition}, COALESCE(#{isAvailable}, TRUE), #{currentBorrowRequestId})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(ItemInstance instance);
 
@@ -30,10 +30,32 @@ public interface ItemInstanceMapper {
     ItemInstance findByQrCodeValue(String qrCodeValue);
 
     /**
-     * Updates the physical condition of a tool after a return inspection.
-     * Called immediately after a return is processed so the warehouse knows
-     * if a returned tool needs repair before it can be re-issued.
+     * Atomically locks a tool instance to an active borrow request.
+     * Guards against concurrent checkouts and guarantees that only tools currently available
+     * and in GOOD condition can be borrowed.
+     */
+    @Update("UPDATE item_instances "
+            + "SET is_available = FALSE, current_borrow_request_id = #{borrowRequestId} "
+            + "WHERE id = #{id} AND is_available = TRUE AND tool_condition = 'GOOD'")
+    int assignToBorrowRequest(@Param("id") Long id, @Param("borrowRequestId") Long borrowRequestId);
+
+    /**
+     * Atomically processes tool return: updates condition, sets availability, and clears active borrow request.
+     * Guards against duplicate returns by ensuring the tool is currently borrowed.
+     */
+    @Update("UPDATE item_instances "
+            + "SET tool_condition = #{condition}, is_available = #{isAvailable}, current_borrow_request_id = NULL "
+            + "WHERE id = #{id} AND current_borrow_request_id IS NOT NULL")
+    int releaseReturn(@Param("id") Long id, @Param("condition") ToolCondition condition,
+            @Param("isAvailable") boolean isAvailable);
+
+    /**
+     * Updates the physical condition of a tool after inspection or repair.
      */
     @Update("UPDATE item_instances SET tool_condition = #{condition} WHERE id = #{id}")
     int updateToolCondition(@Param("id") Long id, @Param("condition") ToolCondition condition);
+
+    /** Retrieves all tool instances currently checked out against a borrow request. */
+    @Select("SELECT * FROM item_instances WHERE current_borrow_request_id = #{borrowRequestId}")
+    java.util.List<ItemInstance> findByCurrentBorrowRequestId(Long borrowRequestId);
 }

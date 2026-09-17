@@ -1,5 +1,6 @@
 package com.siteflow.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -54,7 +55,7 @@ class AssetTrackingControllerTest {
                 .toolCondition(ToolCondition.GOOD)
                 .build();
 
-        when(assetTrackingService.checkoutItemInstance(eq("SN-DRILL-001"), eq(5L)))
+        when(assetTrackingService.checkoutItemInstance(eq("SN-DRILL-001"), eq(5L), any()))
                 .thenReturn(instance);
 
         mockMvc.perform(post("/api/assets/checkout")
@@ -84,7 +85,7 @@ class AssetTrackingControllerTest {
                 .toolCondition(ToolCondition.GOOD)
                 .build();
 
-        when(assetTrackingService.checkoutItemInstance(eq("QR-GRINDER-002"), eq(5L)))
+        when(assetTrackingService.checkoutItemInstance(eq("QR-GRINDER-002"), eq(5L), any()))
                 .thenReturn(instance);
 
         mockMvc.perform(post("/api/assets/checkout")
@@ -141,7 +142,7 @@ class AssetTrackingControllerTest {
                 .toolCondition(ToolCondition.NEEDS_REPAIR)
                 .build();
 
-        when(assetTrackingService.returnItemInstance(eq("SN-DRILL-001"), eq(ToolCondition.NEEDS_REPAIR)))
+        when(assetTrackingService.returnItemInstance(eq("SN-DRILL-001"), eq(ToolCondition.NEEDS_REPAIR), any()))
                 .thenReturn(returned);
 
         mockMvc.perform(post("/api/assets/return")

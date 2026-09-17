@@ -64,9 +64,10 @@ public class ApprovalController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<BorrowRequest> rejectBorrowRequest(
             @PathVariable Long id,
-            @RequestBody @Valid RejectRequestDto dto,
+            @RequestBody(required = false) RejectRequestDto dto,
             @AuthenticationPrincipal UserPrincipal principal) {
-        BorrowRequest rejected = approvalService.rejectBorrowRequest(id, principal.getUserId(), dto.note());
+        String note = (dto != null) ? dto.note() : null;
+        BorrowRequest rejected = approvalService.rejectBorrowRequest(id, principal.getUserId(), note);
         return ApiResponse.success("Borrow request rejected.", rejected);
     }
 }

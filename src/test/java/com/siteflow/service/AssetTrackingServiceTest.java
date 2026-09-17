@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.siteflow.domain.BorrowRequest;
 import com.siteflow.domain.ItemInstance;
 import com.siteflow.domain.enums.ApprovalStatus;
+import com.siteflow.domain.enums.BorrowStatus;
 import com.siteflow.domain.enums.ToolCondition;
 import com.siteflow.mapper.BorrowRequestMapper;
 import com.siteflow.mapper.ItemInstanceMapper;
@@ -41,28 +42,32 @@ class AssetTrackingServiceTest {
     @DisplayName("checkoutItemInstance succeeds for a GOOD tool against an APPROVED borrow request")
     void checkout_goodToolApprovedRequest_succeeds() {
         ItemInstance instance = ItemInstance.builder().id(1L).serialNumber("SN-1").toolCondition(ToolCondition.GOOD)
-                .build();
-        BorrowRequest approved = BorrowRequest.builder().id(5L).approvalStatus(ApprovalStatus.APPROVED).build();
+                .isAvailable(true).build();
+        BorrowRequest approved = BorrowRequest.builder().id(5L).status(BorrowStatus.PENDING)
+                .approvalStatus(ApprovalStatus.APPROVED).build();
         when(itemInstanceMapper.findBySerialNumber("SN-1")).thenReturn(instance);
         when(borrowRequestMapper.findById(5L)).thenReturn(approved);
+        when(itemInstanceMapper.assignToBorrowRequest(1L, 5L)).thenReturn(1);
+        when(itemInstanceMapper.findById(1L)).thenReturn(instance);
 
         ItemInstance result = assetTrackingService.checkoutItemInstance("SN-1", 5L);
 
         assertThat(result.getToolCondition()).isEqualTo(ToolCondition.GOOD);
+        verify(itemInstanceMapper).assignToBorrowRequest(1L, 5L);
+        verify(borrowRequestMapper).updateStatus(5L, BorrowStatus.BORROWED);
     }
 
     @Test
     @DisplayName("checkoutItemInstance rejects a damaged tool — it cannot become immediately available")
     void checkout_brokenTool_throwsWithoutCheckingBorrowRequest() {
         ItemInstance instance = ItemInstance.builder().id(1L).serialNumber("SN-1").toolCondition(ToolCondition.BROKEN)
-                .build();
+                .isAvailable(true).build();
         when(itemInstanceMapper.findBySerialNumber("SN-1")).thenReturn(instance);
 
         assertThatThrownBy(() -> assetTrackingService.checkoutItemInstance("SN-1", 5L))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("BROKEN");
 
-        // Condition is checked before the borrow request is even looked up.
         verify(borrowRequestMapper, never()).findById(any());
     }
 
@@ -70,9 +75,9 @@ class AssetTrackingServiceTest {
     @DisplayName("checkoutItemInstance rejects checkout against a borrow request that isn't approved yet")
     void checkout_borrowRequestNotApproved_throws() {
         ItemInstance instance = ItemInstance.builder().id(1L).serialNumber("SN-1").toolCondition(ToolCondition.GOOD)
-                .build();
-        BorrowRequest pending = BorrowRequest.builder().id(5L).approvalStatus(ApprovalStatus.PENDING_APPROVAL)
-                .build();
+                .isAvailable(true).build();
+        BorrowRequest pending = BorrowRequest.builder().id(5L).status(BorrowStatus.PENDING)
+                .approvalStatus(ApprovalStatus.PENDING_APPROVAL).build();
         when(itemInstanceMapper.findBySerialNumber("SN-1")).thenReturn(instance);
         when(borrowRequestMapper.findById(5L)).thenReturn(pending);
 
@@ -85,11 +90,14 @@ class AssetTrackingServiceTest {
     @DisplayName("checkoutItemInstance falls back to QR code lookup when serial number doesn't match")
     void checkout_unknownSerialNumber_fallsBackToQrCode() {
         ItemInstance instance = ItemInstance.builder().id(1L).qrCodeValue("QR-1").toolCondition(ToolCondition.GOOD)
-                .build();
-        BorrowRequest approved = BorrowRequest.builder().id(5L).approvalStatus(ApprovalStatus.APPROVED).build();
+                .isAvailable(true).build();
+        BorrowRequest approved = BorrowRequest.builder().id(5L).status(BorrowStatus.PENDING)
+                .approvalStatus(ApprovalStatus.APPROVED).build();
         when(itemInstanceMapper.findBySerialNumber("QR-1")).thenReturn(null);
         when(itemInstanceMapper.findByQrCodeValue("QR-1")).thenReturn(instance);
         when(borrowRequestMapper.findById(5L)).thenReturn(approved);
+        when(itemInstanceMapper.assignToBorrowRequest(1L, 5L)).thenReturn(1);
+        when(itemInstanceMapper.findById(1L)).thenReturn(instance);
 
         ItemInstance result = assetTrackingService.checkoutItemInstance("QR-1", 5L);
 
@@ -110,7 +118,7 @@ class AssetTrackingServiceTest {
     @DisplayName("checkoutItemInstance fails with 404-mapped exception when the borrow request id doesn't exist")
     void checkout_unknownBorrowRequest_throwsResourceNotFound() {
         ItemInstance instance = ItemInstance.builder().id(1L).serialNumber("SN-1").toolCondition(ToolCondition.GOOD)
-                .build();
+                .isAvailable(true).build();
         when(itemInstanceMapper.findBySerialNumber("SN-1")).thenReturn(instance);
         when(borrowRequestMapper.findById(99L)).thenReturn(null);
 
@@ -122,15 +130,19 @@ class AssetTrackingServiceTest {
     @DisplayName("returnItemInstance records whatever condition inspection finds, including a downgrade to BROKEN")
     void returnItemInstance_recordsInspectedCondition() {
         ItemInstance beforeReturn = ItemInstance.builder().id(1L).serialNumber("SN-1").toolCondition(ToolCondition.GOOD)
-                .build();
+                .isAvailable(false).currentBorrowRequestId(5L).build();
         ItemInstance afterReturn = ItemInstance.builder().id(1L).serialNumber("SN-1")
-                .toolCondition(ToolCondition.BROKEN).build();
+                .toolCondition(ToolCondition.BROKEN).isAvailable(false).build();
+        BorrowRequest borrowRequest = BorrowRequest.builder().id(5L).status(BorrowStatus.BORROWED).build();
+
         when(itemInstanceMapper.findBySerialNumber("SN-1")).thenReturn(beforeReturn);
+        when(borrowRequestMapper.findById(5L)).thenReturn(borrowRequest);
+        when(itemInstanceMapper.releaseReturn(1L, ToolCondition.BROKEN, false)).thenReturn(1);
         when(itemInstanceMapper.findById(1L)).thenReturn(afterReturn);
 
         ItemInstance result = assetTrackingService.returnItemInstance("SN-1", ToolCondition.BROKEN);
 
-        verify(itemInstanceMapper).updateToolCondition(1L, ToolCondition.BROKEN);
+        verify(itemInstanceMapper).releaseReturn(1L, ToolCondition.BROKEN, false);
         assertThat(result.getToolCondition()).isEqualTo(ToolCondition.BROKEN);
     }
 }
