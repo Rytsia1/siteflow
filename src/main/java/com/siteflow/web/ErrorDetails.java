@@ -8,7 +8,13 @@ import java.util.Map;
  * project's existing envelope (rather than adopting the flat
  * {timestamp, status, error, message, path} shape some frameworks use at the top level)
  * so every response — success or error — has the same {status, message, data} outline.
+ * Includes requestId for correlating client-side failures with backend logs.
  */
 public record ErrorDetails(LocalDateTime timestamp, int status, String error, String path,
-                            Map<String, String> fieldErrors) {
+                            Map<String, String> fieldErrors, String requestId) {
+
+    public ErrorDetails(LocalDateTime timestamp, int status, String error, String path,
+                        Map<String, String> fieldErrors) {
+        this(timestamp, status, error, path, fieldErrors, null);
+    }
 }

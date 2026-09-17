@@ -43,6 +43,16 @@ class JwtAuthenticationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired(required = false)
+    private com.siteflow.security.ratelimit.RateLimiterService rateLimiterService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void resetRateLimiter() {
+        if (rateLimiterService != null) {
+            rateLimiterService.resetAll();
+        }
+    }
+
     @Test
     @DisplayName("1. Successful login returns JWT access token with Bearer type and expiration")
     void login_validCredentials_returnsJwtEnvelope() throws Exception {

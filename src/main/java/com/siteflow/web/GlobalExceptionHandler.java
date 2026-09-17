@@ -128,7 +128,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<ErrorDetails>> handleDataIntegrity(
             DataIntegrityViolationException ex, HttpServletRequest request) {
-        log.warn("Data integrity violation on {} {}", request.getMethod(), request.getRequestURI(), ex);
+        String requestId = resolveRequestId(request);
+        log.warn("[{}] Data integrity violation on {} {}: {}", requestId, request.getMethod(), request.getRequestURI(), ex.getMessage());
         return buildError(HttpStatus.CONFLICT, "The request could not be completed due to a data conflict.", request);
     }
 
@@ -136,7 +137,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ApiResponse<ErrorDetails>> handleDataAccessException(
             DataAccessException ex, HttpServletRequest request) {
-        log.error("Database access error on {} {}", request.getMethod(), request.getRequestURI(), ex);
+        String requestId = resolveRequestId(request);
+        log.error("[{}] Database access error on {} {}: {}", requestId, request.getMethod(), request.getRequestURI(), ex.getMessage(), ex);
         return buildError(HttpStatus.INTERNAL_SERVER_ERROR, "A database error occurred while processing the request.", request);
     }
 
@@ -211,7 +213,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<ErrorDetails>> handleUnexpected(
             Exception ex, HttpServletRequest request) {
-        log.error("Unhandled exception on {} {}", request.getMethod(), request.getRequestURI(), ex);
+        String requestId = resolveRequestId(request);
+        log.error("[{}] Unhandled exception on {} {} (Status: {}): {}",
+                requestId, request.getMethod(), request.getRequestURI(),
+                HttpStatus.INTERNAL_SERVER_ERROR.value(), ex.getMessage(), ex);
         return buildError(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred.", request);
     }
 
@@ -227,8 +232,24 @@ public class GlobalExceptionHandler {
 
     private ApiResponse<ErrorDetails> buildResponseBody(
             HttpStatus status, String message, HttpServletRequest request, Map<String, String> fieldErrors) {
+        String requestId = resolveRequestId(request);
         ErrorDetails details = new ErrorDetails(
-                LocalDateTime.now(), status.value(), status.getReasonPhrase(), request.getRequestURI(), fieldErrors);
+                LocalDateTime.now(), status.value(), status.getReasonPhrase(), request.getRequestURI(), fieldErrors, requestId);
         return ApiResponse.error(message, details);
+    }
+
+    private String resolveRequestId(HttpServletRequest request) {
+        if (request != null) {
+            Object reqId = request.getAttribute("correlationId");
+            if (reqId instanceof String s && !s.isBlank()) {
+                return s;
+            }
+            String headerId = request.getHeader("X-Request-ID");
+            if (headerId != null && !headerId.isBlank()) {
+                return headerId.trim();
+            }
+        }
+        String mdcId = org.slf4j.MDC.get("requestId");
+        return (mdcId != null && !mdcId.isBlank()) ? mdcId : null;
     }
 }
