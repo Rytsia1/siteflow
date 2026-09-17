@@ -57,6 +57,10 @@ public class StockAdjustmentService {
     @Transactional
     public StockAdjustment createAdjustment(Long itemId, Long locationId, AdjustmentType type, int qty,
             String reason, Long adjustedBy) {
+        if (qty <= 0) {
+            throw new IllegalArgumentException("Adjustment quantity must be positive");
+        }
+
         ItemStock stock = itemStockMapper.findByItemIdAndLocationId(itemId, locationId);
         if (stock == null) {
             throw new ResourceNotFoundException(

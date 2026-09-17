@@ -49,6 +49,10 @@ public class BorrowService {
     @Transactional
     public BorrowRequest createBorrowRequest(Long userId, Long locationId, List<BorrowItemRequest> items) {
         for (BorrowItemRequest request : items) {
+            if (request.qty() <= 0) {
+                throw new IllegalArgumentException(
+                        "Requested quantity must be positive for item " + request.itemId());
+            }
             ItemStock stock = itemStockMapper.findByItemIdAndLocationId(request.itemId(), locationId);
             if (stock == null || stock.getCurrentQty() < request.qty()) {
                 throw new IllegalStateException(

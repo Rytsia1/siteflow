@@ -90,6 +90,18 @@ class StockAdjustmentServiceTest {
     }
 
     @Test
+    @DisplayName("Adjustment rejects a non-positive quantity without touching stock or writing any audit row")
+    void createAdjustment_nonPositiveQty_throwsWithoutSideEffects() {
+        assertThatThrownBy(() -> stockAdjustmentService.createAdjustment(1L, 10L, AdjustmentType.IN, 0, null, 7L))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(itemStockMapper, never()).findByItemIdAndLocationId(any(), any());
+        verify(itemStockMapper, never()).adjustQty(any(), anyInt());
+        verify(stockAdjustmentMapper, never()).insert(any());
+        verify(transactionLogMapper, never()).insert(any());
+    }
+
+    @Test
     @DisplayName("Adjustment fails with 404-mapped exception when no stock record exists for the item/location")
     void createAdjustment_unknownItemOrLocation_throwsResourceNotFound() {
         when(itemStockMapper.findByItemIdAndLocationId(1L, 99L)).thenReturn(null);

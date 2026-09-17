@@ -66,6 +66,17 @@ class BorrowServiceTest {
     }
 
     @Test
+    @DisplayName("createBorrowRequest rejects a non-positive quantity without inserting anything")
+    void createBorrowRequest_nonPositiveQty_throwsWithoutSideEffects() {
+        assertThatThrownBy(() -> borrowService.createBorrowRequest(7L, 10L, List.of(new BorrowItemRequest(1L, 0))))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(borrowRequestMapper, never()).insert(any());
+        verify(itemStockMapper, never()).adjustQty(any(), anyInt());
+        verify(transactionLogMapper, never()).insert(any());
+    }
+
+    @Test
     @DisplayName("createBorrowRequest fails when requested quantity exceeds available stock, inserting nothing")
     void createBorrowRequest_insufficientStock_throwsWithoutSideEffects() {
         ItemStock stock = ItemStock.builder().id(50L).itemId(1L).locationId(10L).currentQty(1).build();
