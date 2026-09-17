@@ -88,7 +88,7 @@ class ConcurrencyAndDuplicateSubmissionTest {
     @BeforeEach
     void cleanIdempotencyKeys() {
         idempotencyKeyMapper.deleteAll();
-        jdbcTemplate.update("UPDATE item_stocks SET current_qty = 100 WHERE item_id = 1 AND location_id = 1");
+        jdbcTemplate.update("UPDATE item_stocks SET current_qty = 50 WHERE item_id IN (1, 2) AND location_id = 1");
     }
 
     @Test
@@ -331,11 +331,9 @@ class ConcurrencyAndDuplicateSubmissionTest {
         ItemStock initialStock = itemStockMapper.findByItemIdAndLocationId(5L, 1L);
         int currentQty = initialStock.getCurrentQty();
 
-        // If current qty is less than 5, adjust it up to 5 for the test
-        if (currentQty < 5) {
-            itemStockMapper.adjustQty(initialStock.getId(), 5 - currentQty);
-            currentQty = 5;
-        }
+        // Explicitly set current stock to 5 for this test
+        jdbcTemplate.update("UPDATE item_stocks SET current_qty = 5 WHERE item_id = 5 AND location_id = 1");
+        currentQty = 5;
 
         // We have 5 available. We launch two concurrent requests each asking for 3 units.
         // Total requested = 6 > 5. Exactly 1 must succeed and 1 must fail.
