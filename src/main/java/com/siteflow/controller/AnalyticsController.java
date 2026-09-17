@@ -44,6 +44,12 @@ public class AnalyticsController {
     public ApiResponse<List<ConsumptionTrendView>> getTrends(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        if (endDate.isBefore(startDate)) {
+            throw new IllegalArgumentException("Start date must be before or equal to end date.");
+        }
+        if (java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) > 365 * 5) {
+            throw new IllegalArgumentException("Date range must not exceed 5 years.");
+        }
         return ApiResponse.success("Consumption trends retrieved.",
                 analyticsService.getConsumptionTrends(startDate, endDate));
     }

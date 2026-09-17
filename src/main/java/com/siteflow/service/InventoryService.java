@@ -27,7 +27,34 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public List<ItemSummaryView> listItems() {
-        return itemMapper.findAllWithStock();
+        return listItems(null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ItemSummaryView> listItems(Integer page, Integer size) {
+        List<ItemSummaryView> all = itemMapper.findAllWithStock();
+        if (page == null && size == null) {
+            return all;
+        }
+
+        int pageIndex = (page != null) ? page : 0;
+        int pageSize = (size != null) ? size : 20;
+
+        if (pageIndex < 0) {
+            throw new IllegalArgumentException("Page index must not be negative.");
+        }
+        if (pageSize < 1) {
+            throw new IllegalArgumentException("Page size must be at least 1.");
+        }
+        if (pageSize > 100) {
+            throw new IllegalArgumentException("Page size must not exceed 100.");
+        }
+
+        int fromIndex = pageIndex * pageSize;
+        if (fromIndex >= all.size()) {
+            return List.of();
+        }
+        return all.subList(fromIndex, Math.min(fromIndex + pageSize, all.size()));
     }
 
     @Transactional(readOnly = true)

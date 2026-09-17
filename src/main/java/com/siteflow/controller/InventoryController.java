@@ -13,6 +13,8 @@ import com.siteflow.web.ApiResponse;
 import com.siteflow.web.dto.ItemStockView;
 import com.siteflow.web.dto.ItemSummaryView;
 
+import org.springframework.web.bind.annotation.RequestParam;
+
 @RestController
 @RequestMapping("/api/items")
 public class InventoryController {
@@ -25,8 +27,13 @@ public class InventoryController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF', 'FIELD_STAFF', 'PROCUREMENT')")
-    public ApiResponse<List<ItemSummaryView>> listItems() {
-        return ApiResponse.success("Items retrieved.", inventoryService.listItems());
+    public ApiResponse<List<ItemSummaryView>> listItems(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        if (page == null && size == null) {
+            return ApiResponse.success("Items retrieved.", inventoryService.listItems());
+        }
+        return ApiResponse.success("Items retrieved.", inventoryService.listItems(page, size));
     }
 
     @GetMapping("/{id}/stocks")

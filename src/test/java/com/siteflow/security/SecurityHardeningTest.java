@@ -41,11 +41,15 @@ class SecurityHardeningTest {
     private LoginAttemptService loginAttemptService;
 
     @Autowired
+    private com.siteflow.security.ratelimit.RateLimiterService rateLimiterService;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
         loginAttemptService.resetAll();
+        rateLimiterService.resetAll();
     }
 
     @Nested
@@ -344,7 +348,7 @@ class SecurityHardeningTest {
                             .content(wrongCreds))
                     .andExpect(status().isTooManyRequests())
                     .andExpect(jsonPath("$.status").value("error"))
-                    .andExpect(jsonPath("$.message").value("Too many failed login attempts. Please try again later."))
+                    .andExpect(jsonPath("$.message", containsString("Too many")))
                     .andExpect(jsonPath("$.data.status").value(429))
                     .andExpect(jsonPath("$.data.error").value("Too Many Requests"));
 
@@ -406,6 +410,9 @@ class SecurityHardeningTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(validCreds))
                     .andExpect(status().isOk());
+
+            // Reset request-frequency rate limiter to test login attempt counter reset in isolation
+            rateLimiterService.resetAll();
 
             // Should be able to make 4 more failed attempts without being locked out
             for (int i = 0; i < 4; i++) {

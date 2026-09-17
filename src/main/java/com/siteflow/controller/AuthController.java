@@ -25,6 +25,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 
+import com.siteflow.security.ratelimit.RateLimitProperties;
+import com.siteflow.security.ratelimit.RateLimitingFilter;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/auth")
@@ -33,14 +36,17 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
     private final LoginAttemptService loginAttemptService;
+    private final RateLimitProperties rateLimitProperties;
 
     public AuthController(
             AuthenticationManager authenticationManager,
             JwtTokenProvider jwtTokenProvider,
-            LoginAttemptService loginAttemptService) {
+            LoginAttemptService loginAttemptService,
+            RateLimitProperties rateLimitProperties) {
         this.authenticationManager = authenticationManager;
         this.jwtTokenProvider = jwtTokenProvider;
         this.loginAttemptService = loginAttemptService;
+        this.rateLimitProperties = rateLimitProperties;
     }
 
     /**
@@ -96,13 +102,6 @@ public class AuthController {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
-        if (request == null) {
-            return "unknown";
-        }
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr() != null ? request.getRemoteAddr() : "unknown";
+        return RateLimitingFilter.resolveClientIp(request, rateLimitProperties.isTrustProxy());
     }
 }
