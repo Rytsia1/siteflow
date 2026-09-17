@@ -119,4 +119,25 @@ public class ProcurementController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Purchase order generated successfully.", po));
     }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROCUREMENT', 'FIELD_STAFF', 'WAREHOUSE_STAFF')")
+    public ApiResponse<MaterialRequest> getMaterialRequest(@PathVariable Long id) {
+        return ApiResponse.success("Material request retrieved.", procurementService.getMaterialRequest(id));
+    }
+
+    @GetMapping("/my")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FIELD_STAFF', 'WAREHOUSE_STAFF')")
+    public ApiResponse<List<MaterialRequest>> listMyMaterialRequests(@AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success("Material requests retrieved.", procurementService.listMyMaterialRequests(principal.getUserId()));
+    }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FIELD_STAFF', 'WAREHOUSE_STAFF')")
+    public ApiResponse<MaterialRequest> cancelMaterialRequest(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        MaterialRequest cancelled = procurementService.cancelMaterialRequest(id, principal.getUserId());
+        return ApiResponse.success("Material request cancelled.", cancelled);
+    }
 }

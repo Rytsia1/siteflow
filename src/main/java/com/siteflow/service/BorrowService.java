@@ -3,8 +3,13 @@ package com.siteflow.service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.siteflow.security.UserPrincipal;
 
 import com.siteflow.domain.BorrowItem;
 import com.siteflow.domain.BorrowRequest;
@@ -159,9 +164,45 @@ public class BorrowService {
     }
 
     /**
+     * Retrieves a borrow request by ID with resource-level authorization.
+     * ADMIN and WAREHOUSE_STAFF can inspect any request; FIELD_STAFF can only view their own.
+     */
+    @Transactional(readOnly = true)
+    public BorrowRequest getBorrowRequest(Long id) {
+        BorrowRequest request = borrowRequestMapper.findById(id);
+        if (request == null) {
+            throw new ResourceNotFoundException("Borrow request not found: " + id);
+        }
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null) {
+            boolean isStaffOrAdmin = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_WAREHOUSE_STAFF"));
+            if (!isStaffOrAdmin) {
+                Object principal = auth.getPrincipal();
+                if (principal instanceof UserPrincipal userPrincipal) {
+                    if (!userPrincipal.getUserId().equals(request.getUserId())) {
+                        throw new AccessDeniedException("Access denied.");
+                    }
+                }
+            }
+        }
+        return request;
+    }
+
+    /**
+     * Lists all borrow requests created by the specified user.
+     */
+    @Transactional(readOnly = true)
+    public List<BorrowRequest> listUserBorrowRequests(Long userId) {
+        return borrowRequestMapper.findByUserId(userId);
+    }
+
+    /**
      * Processes every return line against a single borrow request in one transaction. Every
      * line is verified to belong to the request before any of them are applied, so a bad line
      * rejects the whole batch instead of leaving stock partially restored.
+     * Enforces that non-staff callers can only return items for their own borrow request.
      */
     @Transactional
     public void processReturnsForRequest(Long borrowRequestId, List<ReturnLine> lines, Long userId) {
@@ -169,6 +210,15 @@ public class BorrowService {
         if (borrowRequest == null) {
             throw new ResourceNotFoundException("Borrow request not found: " + borrowRequestId);
         }
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isStaffOrAdmin = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_WAREHOUSE_STAFF"));
+
+        if (!isStaffOrAdmin && borrowRequest.getUserId() != null && !borrowRequest.getUserId().equals(userId)) {
+            throw new AccessDeniedException("Access denied.");
+        }
+
         if (borrowRequest.getStatus().isTerminal()) {
             throw new IllegalStateException(
                     "Cannot process returns for borrow request " + borrowRequestId + " in terminal status: " + borrowRequest.getStatus());
@@ -189,5 +239,56 @@ public class BorrowService {
         for (ReturnLine line : lines) {
             processReturn(line.borrowItemId(), line.qty(), userId);
         }
+    }
+
+    /**
+     * Cancels a pending borrow request.
+     * Allowed only for the request owner or ADMIN, and only when the request is still PENDING / PENDING_APPROVAL.
+     * Restores stock decremented during request creation.
+     */
+    @Transactional
+    public BorrowRequest cancelBorrowRequest(Long borrowRequestId, Long userId) {
+        BorrowRequest borrowRequest = borrowRequestMapper.findById(borrowRequestId);
+        if (borrowRequest == null) {
+            throw new ResourceNotFoundException("Borrow request not found: " + borrowRequestId);
+        }
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+        if (!isAdmin && (borrowRequest.getUserId() == null || !borrowRequest.getUserId().equals(userId))) {
+            throw new AccessDeniedException("Access denied.");
+        }
+
+        if (borrowRequest.getStatus() != BorrowStatus.PENDING
+                || borrowRequest.getApprovalStatus() != ApprovalStatus.PENDING_APPROVAL) {
+            throw new IllegalStateException("Cannot cancel borrow request " + borrowRequestId
+                    + " with status: " + borrowRequest.getStatus()
+                    + " and approval status: " + borrowRequest.getApprovalStatus());
+        }
+
+        // Restore reserved stock for all items in the request
+        List<BorrowItem> items = borrowItemMapper.findByBorrowRequestId(borrowRequestId);
+        LocalDateTime now = LocalDateTime.now();
+        for (BorrowItem item : items) {
+            ItemStock stock = itemStockMapper.findByItemIdAndLocationId(item.getItemId(), borrowRequest.getLocationId());
+            if (stock != null) {
+                itemStockMapper.adjustQty(stock.getId(), item.getQtyBorrowed());
+            }
+            transactionLogMapper.insert(TransactionLog.builder()
+                    .itemId(item.getItemId())
+                    .locationId(borrowRequest.getLocationId())
+                    .userId(userId)
+                    .transactionType(TransactionType.RETURN)
+                    .qtyChange(item.getQtyBorrowed())
+                    .referenceId(borrowRequestId)
+                    .timestamp(now)
+                    .build());
+        }
+
+        borrowRequestMapper.updateApproval(
+                borrowRequestId, ApprovalStatus.PENDING_APPROVAL, ApprovalStatus.REJECTED, userId, "Cancelled by requester");
+        return borrowRequestMapper.findById(borrowRequestId);
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -55,5 +56,26 @@ public class BorrowController {
                 .toList();
         borrowService.processReturnsForRequest(id, lines, principal.getUserId());
         return ApiResponse.success("Return processed.", null);
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF', 'FIELD_STAFF')")
+    public ApiResponse<BorrowRequest> getBorrowRequest(@PathVariable Long id) {
+        return ApiResponse.success("Borrow request retrieved.", borrowService.getBorrowRequest(id));
+    }
+
+    @GetMapping("/my")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FIELD_STAFF')")
+    public ApiResponse<List<BorrowRequest>> listMyBorrowRequests(@AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success("Borrow requests retrieved.", borrowService.listUserBorrowRequests(principal.getUserId()));
+    }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FIELD_STAFF')")
+    public ApiResponse<BorrowRequest> cancelBorrowRequest(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        BorrowRequest cancelled = borrowService.cancelBorrowRequest(id, principal.getUserId());
+        return ApiResponse.success("Borrow request cancelled.", cancelled);
     }
 }

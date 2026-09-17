@@ -4,8 +4,13 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.siteflow.security.UserPrincipal;
 
 import com.siteflow.domain.MaterialRequest;
 import com.siteflow.domain.MaterialRequestItem;
@@ -154,6 +159,68 @@ public class ProcurementService {
     @Transactional(readOnly = true)
     public List<MaterialRequestView> listMaterialRequestsByStatus(MaterialRequestStatus status) {
         return materialRequestMapper.findByStatusWithDetails(status);
+    }
+
+    /**
+     * Retrieves a material request by ID with resource-level authorization.
+     * ADMIN and PROCUREMENT can inspect any MR; FIELD_STAFF and WAREHOUSE_STAFF can only view their own.
+     */
+    @Transactional(readOnly = true)
+    public MaterialRequest getMaterialRequest(Long id) {
+        MaterialRequest mr = materialRequestMapper.findById(id);
+        if (mr == null) {
+            throw new ResourceNotFoundException("Material request not found: " + id);
+        }
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null) {
+            boolean isStaffOrAdmin = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_PROCUREMENT"));
+            if (!isStaffOrAdmin) {
+                Object principal = auth.getPrincipal();
+                if (principal instanceof UserPrincipal userPrincipal) {
+                    if (!userPrincipal.getUserId().equals(mr.getRequestedBy())) {
+                        throw new AccessDeniedException("Access denied.");
+                    }
+                }
+            }
+        }
+        return mr;
+    }
+
+    /**
+     * Lists all material requests submitted by the specified user.
+     */
+    @Transactional(readOnly = true)
+    public List<MaterialRequest> listMyMaterialRequests(Long userId) {
+        return materialRequestMapper.findByRequestedBy(userId);
+    }
+
+    /**
+     * Cancels a submitted material request.
+     * Allowed only for the requester or ADMIN, and only when still in SUBMITTED state.
+     */
+    @Transactional
+    public MaterialRequest cancelMaterialRequest(Long mrId, Long userId) {
+        MaterialRequest mr = materialRequestMapper.findById(mrId);
+        if (mr == null) {
+            throw new ResourceNotFoundException("Material request not found: " + mrId);
+        }
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+        if (!isAdmin && (mr.getRequestedBy() == null || !mr.getRequestedBy().equals(userId))) {
+            throw new AccessDeniedException("Access denied.");
+        }
+
+        if (mr.getStatus() != MaterialRequestStatus.SUBMITTED) {
+            throw new IllegalStateException("Cannot cancel material request " + mrId
+                    + " with status: " + mr.getStatus() + ". Must be SUBMITTED.");
+        }
+
+        return transitionApproval(mrId, userId, "Cancelled by requester", MaterialRequestStatus.REJECTED);
     }
 
     // =========================================================================

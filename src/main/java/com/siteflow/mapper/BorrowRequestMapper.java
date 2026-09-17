@@ -28,6 +28,9 @@ public interface BorrowRequestMapper {
     @Select("SELECT * FROM borrow_requests WHERE id = #{id}")
     BorrowRequest findById(Long id);
 
+    @Select("SELECT * FROM borrow_requests WHERE user_id = #{userId} ORDER BY request_date DESC")
+    List<BorrowRequest> findByUserId(Long userId);
+
     @Update("UPDATE borrow_requests SET status = #{status} WHERE id = #{id}")
     int updateStatus(@Param("id") Long id, @Param("status") BorrowStatus status);
 
