@@ -57,17 +57,16 @@ public class ApprovalController {
     }
 
     /**
-     * Rejects a borrow request, optionally accepting an explanation note.
+     * Rejects a borrow request, requiring an explanation note.
      * Accessible only by administrators.
      */
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<BorrowRequest> rejectBorrowRequest(
             @PathVariable Long id,
-            @RequestBody(required = false) RejectRequestDto dto,
+            @RequestBody @Valid RejectRequestDto dto,
             @AuthenticationPrincipal UserPrincipal principal) {
-        String note = (dto != null) ? dto.note() : null;
-        BorrowRequest rejected = approvalService.rejectBorrowRequest(id, principal.getUserId(), note);
+        BorrowRequest rejected = approvalService.rejectBorrowRequest(id, principal.getUserId(), dto.note());
         return ApiResponse.success("Borrow request rejected.", rejected);
     }
 }
