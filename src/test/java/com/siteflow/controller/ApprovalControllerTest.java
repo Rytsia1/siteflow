@@ -130,33 +130,30 @@ class ApprovalControllerTest {
     }
 
     @Test
-    @DisplayName("Admin can reject a borrow request without a note")
-    void rejectBorrowRequest_withoutNote_success() throws Exception {
-        BorrowRequest rejected = BorrowRequest.builder()
-                .id(10L)
-                .userId(2L)
-                .locationId(1L)
-                .requestDate(LocalDateTime.now())
-                .status(BorrowStatus.BORROWED)
-                .approvalStatus(ApprovalStatus.REJECTED)
-                .approvedBy(1L)
-                .build();
+    @DisplayName("Rejecting a borrow request with a blank note returns 400 Bad Request")
+    void rejectBorrowRequest_blankNote_badRequest() throws Exception {
+        mockMvc.perform(post("/api/approvals/borrow-requests/10/reject")
+                        .with(user(adminPrincipal()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"note\":\"\"}"))
+                .andExpect(status().isBadRequest());
+    }
 
-        when(approvalService.rejectBorrowRequest(eq(10L), eq(1L), any()))
-                .thenReturn(rejected);
-
+    @Test
+    @DisplayName("Rejecting a borrow request without a body returns 400 Bad Request")
+    void rejectBorrowRequest_withoutBody_badRequest() throws Exception {
         mockMvc.perform(post("/api/approvals/borrow-requests/10/reject")
                         .with(user(adminPrincipal())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("success"))
-                .andExpect(jsonPath("$.data.approvalStatus").value("REJECTED"));
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     @DisplayName("Non-admin user is forbidden from rejecting borrow requests")
     void rejectBorrowRequest_asFieldStaff_forbidden() throws Exception {
         mockMvc.perform(post("/api/approvals/borrow-requests/10/reject")
-                        .with(user(fieldStaffPrincipal())))
+                        .with(user(fieldStaffPrincipal()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"note\":\"Not approved\"}"))
                 .andExpect(status().isForbidden());
     }
 }
