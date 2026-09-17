@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -143,6 +144,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<ErrorDetails>> handleAccessDenied(
             AccessDeniedException ex, HttpServletRequest request) {
         return buildError(HttpStatus.FORBIDDEN, "Access denied.", request);
+    }
+
+    /** Controller-level authentication failure (e.g. invalid username/password during login). */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiResponse<ErrorDetails>> handleAuthenticationException(
+            AuthenticationException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.UNAUTHORIZED, "Invalid username or password.", request);
     }
 
     /** Unparseable/malformed @RequestBody JSON. */

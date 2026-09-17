@@ -16,12 +16,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * Replaces Spring Security's default HTTP Basic entry point, which sends a 401 with an
- * empty body. A missing/invalid Authorization header is rejected by the security filter
- * chain before the request ever reaches a controller, so GlobalExceptionHandler never
- * sees it — this is the one error path that has to be handled at the security layer
- * instead, but it returns the exact same ApiResponse/ErrorDetails envelope as every
- * other error response.
+ * Authentication entry point for unauthenticated requests rejecting missing or invalid Bearer tokens.
+ * A missing/invalid Authorization header is rejected by the security filter
+ * chain before the request ever reaches a controller, returning the standard
+ * ApiResponse/ErrorDetails envelope.
  */
 @Component
 public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
@@ -37,8 +35,8 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
             throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        // Preserve the standard Basic-auth challenge header even though this is a JSON API.
-        response.setHeader("WWW-Authenticate", "Basic realm=\"siteflow\"");
+        // Send the standard Bearer challenge header for stateless JWT authentication.
+        response.setHeader("WWW-Authenticate", "Bearer realm=\"siteflow\"");
 
         ErrorDetails details = new ErrorDetails(LocalDateTime.now(), HttpServletResponse.SC_UNAUTHORIZED,
                 "Unauthorized", request.getRequestURI(), null);

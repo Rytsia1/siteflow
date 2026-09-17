@@ -14,10 +14,6 @@ spring:
     throw-exception-if-no-handler-found: true
   web:
     resources:
-      # This backend serves no static resources (the Vue SPA is built/served
-      # separately), so disabling the resource-handler fallback lets an unmapped
-      # API path reach GlobalExceptionHandler's NoHandlerFoundException handler
-      # instead of falling through to a generic 404.
       add-mappings: false
 
 mybatis:
@@ -31,6 +27,5 @@ server:
     include-message: never
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:test-jwt-secret-key-32-chars-long-for-tests-only-xyz987}
   expiration-ms: ${JWT_EXPIRATION_MS:3600000}
-

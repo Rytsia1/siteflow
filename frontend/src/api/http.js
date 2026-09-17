@@ -9,7 +9,7 @@ const http = axios.create({
 
 http.interceptors.request.use((config) => {
   if (auth.token) {
-    config.headers.Authorization = `Basic ${auth.token}`
+    config.headers.Authorization = `Bearer ${auth.token}`
   }
   return config
 })

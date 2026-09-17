@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { login, setRole } from '../auth'
+import { loginSuccess } from '../auth'
 import http from '../api/http'
 
 const router = useRouter()
@@ -23,15 +23,15 @@ async function handleSubmit() {
   if (!valid) return
 
   loading.value = true
-  // Basic auth has no dedicated login endpoint — verify the credential by calling
-  // a real protected endpoint. The interceptor's 401 handler shows the error toast.
-  login(form.username, form.password)
   try {
-    const me = await http.get('/auth/me')
-    setRole(me.role)
+    const data = await http.post('/auth/login', {
+      username: form.username,
+      password: form.password,
+    })
+    loginSuccess(data.accessToken, data.username || form.username, data.role)
     router.push('/inventory')
   } catch {
-    // interceptor already surfaced the error and cleared auth
+    // interceptor already surfaced the error toast
   } finally {
     loading.value = false
   }

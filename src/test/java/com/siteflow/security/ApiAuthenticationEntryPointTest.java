@@ -47,7 +47,7 @@ class ApiAuthenticationEntryPointTest {
         entryPoint.commence(request, response, new BadCredentialsException("Bad credentials"));
 
         verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        verify(response).setHeader("WWW-Authenticate", "Basic realm=\"siteflow\"");
+        verify(response).setHeader("WWW-Authenticate", "Bearer realm=\"siteflow\"");
 
         JsonNode json = objectMapper.readTree(body.toString());
         assertThat(json.get("status").asText()).isEqualTo("error");
