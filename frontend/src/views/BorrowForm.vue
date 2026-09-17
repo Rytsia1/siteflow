@@ -3,6 +3,9 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
 
+const activeTab = ref('new')
+
+// ---- Tab 1: New Borrow Request ----
 const formRef = ref()
 const submitting = ref(false)
 const items = ref([])
@@ -71,62 +74,179 @@ async function handleSubmit() {
     submitting.value = false
   }
 }
+
+// ---- Tab 2: Process Return ----
+const returnFormRef = ref()
+const submittingReturn = ref(false)
+
+const returnForm = reactive({
+  requestId: null,
+  lines: [{ borrowItemId: null, qty: 1 }],
+})
+
+const returnRules = {
+  requestId: [{ required: true, message: 'Please enter a Borrow Request ID', trigger: 'change' }],
+}
+
+function returnItemIdRule() {
+  return [{ required: true, message: 'Enter borrow item ID', trigger: 'change' }]
+}
+
+function addReturnLine() {
+  returnForm.lines.push({ borrowItemId: null, qty: 1 })
+}
+
+function removeReturnLine(index) {
+  returnForm.lines.splice(index, 1)
+}
+
+function hasDuplicateReturnItems() {
+  const ids = returnForm.lines.map((l) => l.borrowItemId).filter((id) => id !== null)
+  return new Set(ids).size !== ids.length
+}
+
+async function handleReturnSubmit() {
+  const valid = await returnFormRef.value.validate().catch(() => false)
+  if (!valid) return
+
+  if (returnForm.lines.length === 0) {
+    ElMessage.warning('Add at least one item to return.')
+    return
+  }
+  if (hasDuplicateReturnItems()) {
+    ElMessage.warning('Each borrow item can only appear once per return request.')
+    return
+  }
+
+  submittingReturn.value = true
+  try {
+    await http.post(`/borrow-requests/${returnForm.requestId}/returns`, {
+      items: returnForm.lines.map((l) => ({ borrowItemId: l.borrowItemId, qty: l.qty })),
+    })
+    ElMessage.success('Return processed successfully.')
+    returnForm.requestId = null
+    returnForm.lines = [{ borrowItemId: null, qty: 1 }]
+    returnFormRef.value.clearValidate()
+  } catch {
+    // interceptor already showed the error toast
+  } finally {
+    submittingReturn.value = false
+  }
+}
 </script>
 
 <template>
-  <el-card style="max-width: 640px">
-    <template #header>
-      <h3>New Borrow Request</h3>
-    </template>
+  <el-tabs v-model="activeTab">
+    <el-tab-pane label="New Borrow Request" name="new">
+      <el-card style="max-width: 640px">
+        <template #header>
+          <h3>New Borrow Request</h3>
+        </template>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
-      <el-form-item label="Location" prop="locationId">
-        <el-select v-model="form.locationId" placeholder="Select a location" style="width: 100%">
-          <el-option
-            v-for="loc in locations"
-            :key="loc.id"
-            :label="loc.locationName"
-            :value="loc.id"
-          />
-        </el-select>
-      </el-form-item>
-
-      <el-form-item label="Items">
-        <div v-for="(line, index) in form.lines" :key="index" class="item-row">
-          <el-form-item
-            :prop="`lines.${index}.itemId`"
-            :rules="lineItemIdRule()"
-            class="item-select"
-          >
-            <el-select v-model="line.itemId" placeholder="Search item" filterable style="width: 100%">
+        <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
+          <el-form-item label="Location" prop="locationId">
+            <el-select v-model="form.locationId" placeholder="Select a location" style="width: 100%">
               <el-option
-                v-for="item in items"
-                :key="item.id"
-                :label="`${item.itemCode} — ${item.name}`"
-                :value="item.id"
+                v-for="loc in locations"
+                :key="loc.id"
+                :label="loc.locationName"
+                :value="loc.id"
               />
             </el-select>
           </el-form-item>
-          <el-input-number v-model="line.qty" :min="1" />
-          <el-button
-            type="danger"
-            plain
-            :disabled="form.lines.length === 1"
-            @click="removeLine(index)"
-          >
-            Remove
-          </el-button>
-        </div>
-        <el-button @click="addLine">+ Add Item</el-button>
-      </el-form-item>
 
-      <el-form-item>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit">
-          Submit Borrow Request
-        </el-button>
-      </el-form-item>
-    </el-form>
-  </el-card>
+          <el-form-item label="Items">
+            <div v-for="(line, index) in form.lines" :key="index" class="item-row">
+              <el-form-item
+                :prop="`lines.${index}.itemId`"
+                :rules="lineItemIdRule()"
+                class="item-select"
+              >
+                <el-select v-model="line.itemId" placeholder="Search item" filterable style="width: 100%">
+                  <el-option
+                    v-for="item in items"
+                    :key="item.id"
+                    :label="`${item.itemCode} — ${item.name}`"
+                    :value="item.id"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-input-number v-model="line.qty" :min="1" />
+              <el-button
+                type="danger"
+                plain
+                :disabled="form.lines.length === 1"
+                @click="removeLine(index)"
+              >
+                Remove
+              </el-button>
+            </div>
+            <el-button @click="addLine">+ Add Item</el-button>
+          </el-form-item>
+
+          <el-form-item>
+            <el-button type="primary" :loading="submitting" @click="handleSubmit">
+              Submit Borrow Request
+            </el-button>
+          </el-form-item>
+        </el-form>
+      </el-card>
+    </el-tab-pane>
+
+    <el-tab-pane label="Process Return" name="return">
+      <el-card style="max-width: 640px">
+        <template #header>
+          <h3>Process Return</h3>
+        </template>
+
+        <el-form ref="returnFormRef" :model="returnForm" :rules="returnRules" label-position="top">
+          <el-form-item label="Borrow Request ID" prop="requestId">
+            <el-input-number
+              v-model="returnForm.requestId"
+              :min="1"
+              controls-position="right"
+              placeholder="Enter Borrow Request ID"
+              style="width: 100%"
+            />
+          </el-form-item>
+
+          <el-form-item label="Items to Return">
+            <div v-for="(line, index) in returnForm.lines" :key="index" class="item-row">
+              <el-form-item
+                :prop="`lines.${index}.borrowItemId`"
+                :rules="returnItemIdRule()"
+                class="item-select"
+              >
+                <el-input-number
+                  v-model="line.borrowItemId"
+                  :min="1"
+                  controls-position="right"
+                  placeholder="Borrow Item ID"
+                  style="width: 100%"
+                />
+              </el-form-item>
+              <el-input-number v-model="line.qty" :min="1" controls-position="right" />
+              <el-button
+                type="danger"
+                plain
+                :disabled="returnForm.lines.length === 1"
+                @click="removeReturnLine(index)"
+              >
+                Remove
+              </el-button>
+            </div>
+            <el-button @click="addReturnLine">+ Add Item</el-button>
+          </el-form-item>
+
+          <el-form-item>
+            <el-button type="primary" :loading="submittingReturn" @click="handleReturnSubmit">
+              Process Return
+            </el-button>
+          </el-form-item>
+        </el-form>
+      </el-card>
+    </el-tab-pane>
+  </el-tabs>
 </template>
 
 <style scoped>

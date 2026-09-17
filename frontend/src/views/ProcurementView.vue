@@ -46,6 +46,9 @@ async function submitMaterialRequest() {
     ElMessage.success('Material request submitted.')
     mrForm.justification = ''
     mrForm.lines = [{ itemId: null, qty: 1 }]
+    if (canApprove.value) {
+      await loadPendingRequests()
+    }
   } catch {
     // interceptor already showed the error toast
   } finally {
@@ -83,11 +86,10 @@ async function approve(row) {
   try {
     await http.post(`/procurement/material-requests/${row.id}/approve`)
     ElMessage.success('Material request approved.')
-    // Move the row from Pending to Approved locally instead of re-fetching both
-    // lists — the columns both tables display (requesterName/justification/
-    // requestDate) don't change on approval, so no network round-trip is needed.
-    pendingRequests.value = pendingRequests.value.filter((r) => r.id !== row.id)
-    approvedRequests.value = [...approvedRequests.value, row]
+    await loadPendingRequests()
+    if (isAdmin.value) {
+      await loadApprovedRequests()
+    }
   } catch {
     // interceptor already showed the error toast
   } finally {
@@ -112,8 +114,7 @@ async function submitReject() {
     })
     ElMessage.success('Material request rejected.')
     rejectDialogVisible.value = false
-    // Rejected requests just drop off the Pending list — no re-fetch needed.
-    pendingRequests.value = pendingRequests.value.filter((r) => r.id !== rejectTarget.value.id)
+    await loadPendingRequests()
   } catch {
     // interceptor already showed the error toast
   } finally {
