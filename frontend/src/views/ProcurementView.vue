@@ -32,6 +32,8 @@ async function loadItems() {
 }
 
 async function submitMaterialRequest() {
+  if (submitting.value) return
+
   if (mrForm.lines.some((l) => !l.itemId)) {
     ElMessage.warning('Choose an item for every line.')
     return
@@ -82,6 +84,8 @@ async function loadPendingRequests() {
 }
 
 async function approve(row) {
+  if (approvingId.value !== null) return
+
   approvingId.value = row.id
   try {
     await http.post(`/procurement/material-requests/${row.id}/approve`)
@@ -104,6 +108,8 @@ function openRejectDialog(row) {
 }
 
 async function submitReject() {
+  if (rejecting.value) return
+
   const valid = await rejectFormRef.value.validate().catch(() => false)
   if (!valid) return
 
@@ -153,6 +159,8 @@ function openPoDialog(row) {
 }
 
 async function submitGeneratePo() {
+  if (generating.value) return
+
   const valid = await poFormRef.value.validate().catch(() => false)
   if (!valid) return
 
@@ -225,7 +233,7 @@ onMounted(() => {
           </el-form-item>
 
           <el-form-item>
-            <el-button type="primary" :loading="submitting" @click="submitMaterialRequest">
+            <el-button type="primary" :loading="submitting" :disabled="submitting" @click="submitMaterialRequest">
               Submit Material Request
             </el-button>
           </el-form-item>
@@ -248,10 +256,10 @@ onMounted(() => {
         </el-table-column>
         <el-table-column label="Actions" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button type="success" size="small" :loading="approvingId === row.id" @click="approve(row)">
+            <el-button type="success" size="small" :loading="approvingId === row.id" :disabled="approvingId !== null" @click="approve(row)">
               Approve
             </el-button>
-            <el-button type="danger" size="small" @click="openRejectDialog(row)">Reject</el-button>
+            <el-button type="danger" size="small" :disabled="approvingId !== null" @click="openRejectDialog(row)">Reject</el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -298,7 +306,7 @@ onMounted(() => {
     </el-form>
     <template #footer>
       <el-button @click="rejectDialogVisible = false">Cancel</el-button>
-      <el-button type="danger" :loading="rejecting" @click="submitReject">Reject</el-button>
+      <el-button type="danger" :loading="rejecting" :disabled="rejecting" @click="submitReject">Reject</el-button>
     </template>
   </el-dialog>
 
@@ -318,7 +326,7 @@ onMounted(() => {
     </el-form>
     <template #footer>
       <el-button @click="poDialogVisible = false">Cancel</el-button>
-      <el-button type="primary" :loading="generating" @click="submitGeneratePo">Generate</el-button>
+      <el-button type="primary" :loading="generating" :disabled="generating" @click="submitGeneratePo">Generate</el-button>
     </template>
   </el-dialog>
 </template>

@@ -6,6 +6,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -35,10 +36,15 @@ public class StockAdjustmentController {
     @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
     public ResponseEntity<ApiResponse<StockAdjustment>> createAdjustment(
             @RequestBody @Valid CreateStockAdjustmentDto dto,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @AuthenticationPrincipal UserPrincipal principal) {
-        StockAdjustment created = stockAdjustmentService.createAdjustment(
-                dto.itemId(), dto.locationId(), dto.adjustmentType(), dto.qty(), dto.reason(),
-                principal.getUserId());
+        StockAdjustment created = (idempotencyKey != null && !idempotencyKey.isBlank())
+                ? stockAdjustmentService.createAdjustment(
+                        dto.itemId(), dto.locationId(), dto.adjustmentType(), dto.qty(), dto.reason(),
+                        principal.getUserId(), idempotencyKey)
+                : stockAdjustmentService.createAdjustment(
+                        dto.itemId(), dto.locationId(), dto.adjustmentType(), dto.qty(), dto.reason(),
+                        principal.getUserId());
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Stock adjustment recorded.", created));

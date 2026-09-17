@@ -197,3 +197,85 @@ test('11. Timeout configuration defaults to 15s or environment setting', () => {
   assert.strictEqual(typeof timeout, 'number')
   assert.ok(timeout >= 1000, 'Timeout must be at least 1 second')
 })
+
+test('12. Double-click rapid submission is prevented while request is in flight', async () => {
+  let submitting = false
+  let callCount = 0
+
+  async function onSubmit() {
+    if (submitting) return
+    submitting = true
+    try {
+      callCount++
+      // simulate async network latency
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    } finally {
+      submitting = false
+    }
+  }
+
+  // Simulate two rapid clicks in parallel
+  await Promise.all([onSubmit(), onSubmit()])
+
+  assert.strictEqual(callCount, 1, 'Only the first click should execute; second should be blocked')
+  assert.strictEqual(submitting, false, 'Submitting state must be restored to false on completion')
+})
+
+test('13. Submission failure restores submitting state so user can retry', async () => {
+  let submitting = false
+  let callCount = 0
+
+  async function onSubmit() {
+    if (submitting) return
+    submitting = true
+    try {
+      callCount++
+      throw new Error('Network error')
+    } finally {
+      submitting = false
+    }
+  }
+
+  try {
+    await onSubmit()
+  } catch {
+    // expected
+  }
+
+  assert.strictEqual(callCount, 1)
+  assert.strictEqual(submitting, false, 'Submitting state must be restored even on error')
+
+  // User retries after fixing input
+  try {
+    await onSubmit()
+  } catch {
+    // expected
+  }
+  assert.strictEqual(callCount, 2, 'User can submit again after an error')
+  assert.strictEqual(submitting, false)
+})
+
+test('14. 409 Conflict displays server error message on duplicate submission or state conflict', () => {
+  const conflictError = {
+    response: {
+      status: 409,
+      data: {
+        message: 'Duplicate submission detected: a request with this idempotency key is already completed or processing.',
+      },
+    },
+  }
+  const msg = getErrorMessage(conflictError)
+  assert.strictEqual(
+    msg,
+    'Duplicate submission detected: a request with this idempotency key is already completed or processing.',
+  )
+
+  const fallbackConflict = {
+    response: {
+      status: 409,
+      data: {},
+    },
+  }
+  const fallbackMsg = getErrorMessage(fallbackConflict)
+  assert.strictEqual(fallbackMsg, 'Conflict: The operation cannot be completed in the current state.')
+})

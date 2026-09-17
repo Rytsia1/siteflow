@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -36,11 +37,14 @@ public class BorrowController {
     @PreAuthorize("hasAnyRole('ADMIN', 'FIELD_STAFF')")
     public ResponseEntity<ApiResponse<BorrowRequest>> createBorrowRequest(
             @RequestBody @Valid CreateBorrowRequestDto dto,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @AuthenticationPrincipal UserPrincipal principal) {
         List<BorrowService.BorrowItemRequest> items = dto.items().stream()
                 .map(line -> new BorrowService.BorrowItemRequest(line.itemId(), line.qty()))
                 .toList();
-        BorrowRequest created = borrowService.createBorrowRequest(principal.getUserId(), dto.locationId(), items);
+        BorrowRequest created = (idempotencyKey != null && !idempotencyKey.isBlank())
+                ? borrowService.createBorrowRequest(principal.getUserId(), dto.locationId(), items, idempotencyKey)
+                : borrowService.createBorrowRequest(principal.getUserId(), dto.locationId(), items);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Borrow request created.", created));
     }

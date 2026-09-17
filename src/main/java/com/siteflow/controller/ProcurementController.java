@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -58,15 +59,15 @@ public class ProcurementController {
     @PreAuthorize("hasAnyRole('ADMIN', 'FIELD_STAFF', 'WAREHOUSE_STAFF')")
     public ResponseEntity<ApiResponse<MaterialRequest>> submitMaterialRequest(
             @RequestBody @Valid MaterialRequestDto dto,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @AuthenticationPrincipal UserPrincipal principal) {
         List<ProcurementService.MrLineItem> lines = dto.items().stream()
                 .map(line -> new ProcurementService.MrLineItem(line.itemId(), line.getQuantity()))
                 .toList();
 
-        MaterialRequest created = procurementService.submitMaterialRequest(
-                principal.getUserId(),
-                dto.justification(),
-                lines);
+        MaterialRequest created = (idempotencyKey != null && !idempotencyKey.isBlank())
+                ? procurementService.submitMaterialRequest(principal.getUserId(), dto.justification(), lines, idempotencyKey)
+                : procurementService.submitMaterialRequest(principal.getUserId(), dto.justification(), lines);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Material request submitted successfully.", created));

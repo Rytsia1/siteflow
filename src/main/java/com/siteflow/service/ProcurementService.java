@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -48,13 +49,23 @@ public class ProcurementService {
     private final MaterialRequestMapper materialRequestMapper;
     private final MaterialRequestItemMapper materialRequestItemMapper;
     private final PurchaseOrderMapper purchaseOrderMapper;
+    private final IdempotencyService idempotencyService;
+
+    @Autowired
+    public ProcurementService(MaterialRequestMapper materialRequestMapper,
+                              MaterialRequestItemMapper materialRequestItemMapper,
+                              PurchaseOrderMapper purchaseOrderMapper,
+                              IdempotencyService idempotencyService) {
+        this.materialRequestMapper = materialRequestMapper;
+        this.materialRequestItemMapper = materialRequestItemMapper;
+        this.purchaseOrderMapper = purchaseOrderMapper;
+        this.idempotencyService = idempotencyService;
+    }
 
     public ProcurementService(MaterialRequestMapper materialRequestMapper,
                               MaterialRequestItemMapper materialRequestItemMapper,
                               PurchaseOrderMapper purchaseOrderMapper) {
-        this.materialRequestMapper = materialRequestMapper;
-        this.materialRequestItemMapper = materialRequestItemMapper;
-        this.purchaseOrderMapper = purchaseOrderMapper;
+        this(materialRequestMapper, materialRequestItemMapper, purchaseOrderMapper, null);
     }
 
     /** Represents a single line in a material request: which item and how many. */
@@ -69,13 +80,9 @@ public class ProcurementService {
      *
      * <p>Transition: (new) → SUBMITTED
      *
-     * <p>The request is created directly in SUBMITTED state rather than DRAFT
-     * because the caller (a field worker or warehouse staff) is explicitly
-     * requesting approval. A DRAFT state would require a separate submit call
-     * and is reserved for future use by a UI "save for later" feature.
-     *
      * <p>All line items are inserted inside the same transaction so a failure
      * on any line rolls back the entire request, leaving no orphan MR header.
+     * Duplicate submissions are rejected via database-backed idempotency.
      *
      * @param userId        the user raising the procurement need
      * @param justification free-text business reason for the request
@@ -85,34 +92,58 @@ public class ProcurementService {
     @Transactional
     public MaterialRequest submitMaterialRequest(Long userId, String justification,
                                                  List<MrLineItem> lines) {
+        return submitMaterialRequest(userId, justification, lines, null);
+    }
+
+    @Transactional
+    public MaterialRequest submitMaterialRequest(Long userId, String justification,
+                                                 List<MrLineItem> lines, String idempotencyKey) {
         if (lines == null || lines.isEmpty()) {
             throw new IllegalArgumentException("A material request must contain at least one item");
         }
 
-        // Build and persist the MR header; status starts at SUBMITTED
-        MaterialRequest mr = MaterialRequest.builder()
-                .requestedBy(userId)
-                .requestDate(LocalDateTime.now())
-                .status(MaterialRequestStatus.SUBMITTED)   // bypasses DRAFT for direct submission
-                .justification(justification)
-                .build();
-        materialRequestMapper.insert(mr);
-
-        // Persist each requested line item, cascading under the new MR id
-        for (MrLineItem line : lines) {
-            if (line.requestedQty() <= 0) {
-                throw new IllegalArgumentException(
-                        "Requested quantity must be positive for item " + line.itemId());
-            }
-            MaterialRequestItem item = MaterialRequestItem.builder()
-                    .mrId(mr.getId())
-                    .itemId(line.itemId())
-                    .requestedQty(line.requestedQty())
-                    .build();
-            materialRequestItemMapper.insert(item);
+        String key = null;
+        if (idempotencyService != null) {
+            key = (idempotencyKey != null && !idempotencyKey.isBlank())
+                    ? "idemp:" + userId + ":" + idempotencyKey
+                    : idempotencyService.buildFingerprint("mr", userId, justification + ":" + lines);
+            idempotencyService.acquireOrThrow(key, userId, "/api/procurement/material-requests");
         }
 
-        return mr;
+        try {
+            // Build and persist the MR header; status starts at SUBMITTED
+            MaterialRequest mr = MaterialRequest.builder()
+                    .requestedBy(userId)
+                    .requestDate(LocalDateTime.now())
+                    .status(MaterialRequestStatus.SUBMITTED)   // bypasses DRAFT for direct submission
+                    .justification(justification)
+                    .build();
+            materialRequestMapper.insert(mr);
+
+            // Persist each requested line item, cascading under the new MR id
+            for (MrLineItem line : lines) {
+                if (line.requestedQty() <= 0) {
+                    throw new IllegalArgumentException(
+                            "Requested quantity must be positive for item " + line.itemId());
+                }
+                MaterialRequestItem item = MaterialRequestItem.builder()
+                        .mrId(mr.getId())
+                        .itemId(line.itemId())
+                        .requestedQty(line.requestedQty())
+                        .build();
+                materialRequestItemMapper.insert(item);
+            }
+
+            if (idempotencyService != null) {
+                idempotencyService.complete(key);
+            }
+            return mr;
+        } catch (Exception e) {
+            if (idempotencyService != null) {
+                idempotencyService.release(key);
+            }
+            throw e;
+        }
     }
 
     /**

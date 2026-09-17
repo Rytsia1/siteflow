@@ -3,6 +3,7 @@ package com.siteflow.service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -31,13 +32,22 @@ public class BorrowService {
     private final BorrowItemMapper borrowItemMapper;
     private final ItemStockMapper itemStockMapper;
     private final TransactionLogMapper transactionLogMapper;
+    private final IdempotencyService idempotencyService;
 
+    @Autowired
     public BorrowService(BorrowRequestMapper borrowRequestMapper, BorrowItemMapper borrowItemMapper,
-            ItemStockMapper itemStockMapper, TransactionLogMapper transactionLogMapper) {
+            ItemStockMapper itemStockMapper, TransactionLogMapper transactionLogMapper,
+            IdempotencyService idempotencyService) {
         this.borrowRequestMapper = borrowRequestMapper;
         this.borrowItemMapper = borrowItemMapper;
         this.itemStockMapper = itemStockMapper;
         this.transactionLogMapper = transactionLogMapper;
+        this.idempotencyService = idempotencyService;
+    }
+
+    public BorrowService(BorrowRequestMapper borrowRequestMapper, BorrowItemMapper borrowItemMapper,
+            ItemStockMapper itemStockMapper, TransactionLogMapper transactionLogMapper) {
+        this(borrowRequestMapper, borrowItemMapper, itemStockMapper, transactionLogMapper, null);
     }
 
     public record BorrowItemRequest(Long itemId, int qty) {
@@ -46,61 +56,93 @@ public class BorrowService {
     public record ReturnLine(Long borrowItemId, int qty) {
     }
 
+    private ItemStock findStock(Long itemId, Long locationId) {
+        ItemStock stock = itemStockMapper.findByItemIdAndLocationIdForUpdate(itemId, locationId);
+        if (stock == null) {
+            stock = itemStockMapper.findByItemIdAndLocationId(itemId, locationId);
+        }
+        return stock;
+    }
+
     /**
      * Creates a borrow request and allocates stock for each requested item in one transaction:
-     * stock availability is checked up front, then each item is recorded, stock is decremented,
-     * and a BORROW transaction log is written. Any failure rolls back the whole request.
+     * stock availability is checked up front with pessimistic row locks, then each item is recorded,
+     * stock is decremented, and a BORROW transaction log is written.
+     * Duplicate submissions are rejected via database-backed idempotency.
      */
     @Transactional
     public BorrowRequest createBorrowRequest(Long userId, Long locationId, List<BorrowItemRequest> items) {
-        for (BorrowItemRequest request : items) {
-            if (request.qty() <= 0) {
-                throw new IllegalArgumentException(
-                        "Requested quantity must be positive for item " + request.itemId());
-            }
-            ItemStock stock = itemStockMapper.findByItemIdAndLocationId(request.itemId(), locationId);
-            if (stock == null || stock.getCurrentQty() < request.qty()) {
-                throw new IllegalStateException(
-                        "Insufficient stock for item " + request.itemId() + " at location " + locationId);
-            }
+        return createBorrowRequest(userId, locationId, items, null);
+    }
+
+    @Transactional
+    public BorrowRequest createBorrowRequest(Long userId, Long locationId, List<BorrowItemRequest> items, String idempotencyKey) {
+        String key = null;
+        if (idempotencyService != null) {
+            key = (idempotencyKey != null && !idempotencyKey.isBlank())
+                    ? "idemp:" + userId + ":" + idempotencyKey
+                    : idempotencyService.buildFingerprint("borrow", userId, locationId + ":" + items);
+            idempotencyService.acquireOrThrow(key, userId, "/api/borrow-requests");
         }
 
-        BorrowRequest borrowRequest = BorrowRequest.builder()
-                .userId(userId)
-                .locationId(locationId)
-                .requestDate(LocalDateTime.now())
-                .status(BorrowStatus.PENDING)
-                .approvalStatus(ApprovalStatus.PENDING_APPROVAL)
-                .build();
-        borrowRequestMapper.insert(borrowRequest);
-
-        for (BorrowItemRequest request : items) {
-            BorrowItem borrowItem = BorrowItem.builder()
-                    .borrowRequestId(borrowRequest.getId())
-                    .itemId(request.itemId())
-                    .qtyBorrowed(request.qty())
-                    .qtyReturned(0)
-                    .build();
-            borrowItemMapper.insert(borrowItem);
-
-            ItemStock stock = itemStockMapper.findByItemIdAndLocationId(request.itemId(), locationId);
-            if (itemStockMapper.adjustQty(stock.getId(), -request.qty()) == 0) {
-                throw new IllegalStateException(
-                        "Insufficient stock for item " + request.itemId() + " at location " + locationId);
+        try {
+            for (BorrowItemRequest request : items) {
+                if (request.qty() <= 0) {
+                    throw new IllegalArgumentException(
+                            "Requested quantity must be positive for item " + request.itemId());
+                }
+                ItemStock stock = findStock(request.itemId(), locationId);
+                if (stock == null || stock.getCurrentQty() < request.qty()) {
+                    throw new IllegalStateException(
+                            "Insufficient stock for item " + request.itemId() + " at location " + locationId);
+                }
             }
 
-            transactionLogMapper.insert(TransactionLog.builder()
-                    .itemId(request.itemId())
-                    .locationId(locationId)
+            BorrowRequest borrowRequest = BorrowRequest.builder()
                     .userId(userId)
-                    .transactionType(TransactionType.BORROW)
-                    .qtyChange(-request.qty())
-                    .referenceId(borrowRequest.getId())
-                    .timestamp(LocalDateTime.now())
-                    .build());
-        }
+                    .locationId(locationId)
+                    .requestDate(LocalDateTime.now())
+                    .status(BorrowStatus.PENDING)
+                    .approvalStatus(ApprovalStatus.PENDING_APPROVAL)
+                    .build();
+            borrowRequestMapper.insert(borrowRequest);
 
-        return borrowRequest;
+            for (BorrowItemRequest request : items) {
+                BorrowItem borrowItem = BorrowItem.builder()
+                        .borrowRequestId(borrowRequest.getId())
+                        .itemId(request.itemId())
+                        .qtyBorrowed(request.qty())
+                        .qtyReturned(0)
+                        .build();
+                borrowItemMapper.insert(borrowItem);
+
+                ItemStock stock = findStock(request.itemId(), locationId);
+                if (itemStockMapper.adjustQty(stock.getId(), -request.qty()) == 0) {
+                    throw new IllegalStateException(
+                            "Insufficient stock for item " + request.itemId() + " at location " + locationId);
+                }
+
+                transactionLogMapper.insert(TransactionLog.builder()
+                        .itemId(request.itemId())
+                        .locationId(locationId)
+                        .userId(userId)
+                        .transactionType(TransactionType.BORROW)
+                        .qtyChange(-request.qty())
+                        .referenceId(borrowRequest.getId())
+                        .timestamp(LocalDateTime.now())
+                        .build());
+            }
+
+            if (idempotencyService != null) {
+                idempotencyService.complete(key);
+            }
+            return borrowRequest;
+        } catch (Exception e) {
+            if (idempotencyService != null) {
+                idempotencyService.release(key);
+            }
+            throw e;
+        }
     }
 
     /**

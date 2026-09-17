@@ -46,6 +46,8 @@ function hasDuplicateItems() {
 }
 
 async function handleSubmit() {
+  if (submitting.value) return
+
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
 
@@ -106,6 +108,8 @@ function hasDuplicateReturnItems() {
 }
 
 async function handleReturnSubmit() {
+  if (submittingReturn.value) return
+
   const valid = await returnFormRef.value.validate().catch(() => false)
   if (!valid) return
 
@@ -145,7 +149,11 @@ async function handleReturnSubmit() {
 
         <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
           <el-form-item label="Location" prop="locationId">
-            <el-select v-model="form.locationId" placeholder="Select a location" style="width: 100%">
+            <el-select
+              v-model="form.locationId"
+              placeholder="Select warehouse or site"
+              style="width: 100%"
+            >
               <el-option
                 v-for="loc in locations"
                 :key="loc.id"
@@ -155,23 +163,28 @@ async function handleReturnSubmit() {
             </el-select>
           </el-form-item>
 
-          <el-form-item label="Items">
+          <el-form-item label="Items to Borrow">
             <div v-for="(line, index) in form.lines" :key="index" class="item-row">
               <el-form-item
                 :prop="`lines.${index}.itemId`"
                 :rules="lineItemIdRule()"
                 class="item-select"
               >
-                <el-select v-model="line.itemId" placeholder="Search item" filterable style="width: 100%">
+                <el-select
+                  v-model="line.itemId"
+                  placeholder="Select item"
+                  filterable
+                  style="width: 100%"
+                >
                   <el-option
                     v-for="item in items"
                     :key="item.id"
-                    :label="`${item.itemCode} — ${item.name}`"
+                    :label="`${item.itemCode} - ${item.name}`"
                     :value="item.id"
                   />
                 </el-select>
               </el-form-item>
-              <el-input-number v-model="line.qty" :min="1" />
+              <el-input-number v-model="line.qty" :min="1" controls-position="right" />
               <el-button
                 type="danger"
                 plain
@@ -185,7 +198,7 @@ async function handleReturnSubmit() {
           </el-form-item>
 
           <el-form-item>
-            <el-button type="primary" :loading="submitting" @click="handleSubmit">
+            <el-button type="primary" :loading="submitting" :disabled="submitting" @click="handleSubmit">
               Submit Borrow Request
             </el-button>
           </el-form-item>
@@ -239,7 +252,7 @@ async function handleReturnSubmit() {
           </el-form-item>
 
           <el-form-item>
-            <el-button type="primary" :loading="submittingReturn" @click="handleReturnSubmit">
+            <el-button type="primary" :loading="submittingReturn" :disabled="submittingReturn" @click="handleReturnSubmit">
               Process Return
             </el-button>
           </el-form-item>

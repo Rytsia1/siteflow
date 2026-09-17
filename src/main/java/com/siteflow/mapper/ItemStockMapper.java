@@ -18,6 +18,9 @@ public interface ItemStockMapper {
     @Select("SELECT * FROM item_stocks WHERE item_id = #{itemId} AND location_id = #{locationId}")
     ItemStock findByItemIdAndLocationId(@Param("itemId") Long itemId, @Param("locationId") Long locationId);
 
+    @Select("SELECT * FROM item_stocks WHERE item_id = #{itemId} AND location_id = #{locationId} FOR UPDATE")
+    ItemStock findByItemIdAndLocationIdForUpdate(@Param("itemId") Long itemId, @Param("locationId") Long locationId);
+
     @Select("SELECT s.location_id AS location_id, l.location_name AS location_name, s.current_qty AS current_qty "
             + "FROM item_stocks s JOIN locations l ON l.id = s.location_id "
             + "WHERE s.item_id = #{itemId} ORDER BY l.location_name")

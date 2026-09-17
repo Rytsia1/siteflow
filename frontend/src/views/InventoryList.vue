@@ -85,6 +85,8 @@ async function openAdjustmentDialog(row) {
 }
 
 async function submitAdjustment() {
+  if (adjusting.value) return
+
   const valid = await adjustFormRef.value.validate().catch(() => false)
   if (!valid) return
 
@@ -201,7 +203,7 @@ onMounted(() => {
       </el-form>
       <template #footer>
         <el-button @click="adjustDialogVisible = false">Cancel</el-button>
-        <el-button type="primary" :loading="adjusting" @click="submitAdjustment">
+        <el-button type="primary" :loading="adjusting" :disabled="adjusting" @click="submitAdjustment">
           Submit Adjustment
         </el-button>
       </template>
