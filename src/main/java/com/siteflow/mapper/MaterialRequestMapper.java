@@ -44,6 +44,23 @@ public interface MaterialRequestMapper {
                      @Param("newStatus") MaterialRequestStatus newStatus);
 
     /**
+     * Records an approval decision: sets the status (APPROVED or REJECTED), the id of the
+     * admin who decided, and an optional explanatory note, all in one atomic write so no
+     * partial approval state is ever persisted. The WHERE clause only matches while the MR
+     * is still in expectedStatus, so two concurrent approve/reject calls on the same request
+     * can't both succeed. Used only for the SUBMITTED → APPROVED|REJECTED edge; updateStatus
+     * above remains the mechanism for transitions that don't carry approval audit fields.
+     */
+    @Update("UPDATE material_requests "
+            + "SET status = #{newStatus}, approved_by = #{approvedBy}, approval_note = #{note} "
+            + "WHERE id = #{id} AND status = #{expectedStatus}")
+    int updateApproval(@Param("id") Long id,
+                       @Param("expectedStatus") MaterialRequestStatus expectedStatus,
+                       @Param("newStatus") MaterialRequestStatus newStatus,
+                       @Param("approvedBy") Long approvedBy,
+                       @Param("note") String note);
+
+    /**
      * Lists requests by status with the requester's name resolved, for the
      * procurement dashboard (avoids a raw-user-id-only table in the UI).
      */

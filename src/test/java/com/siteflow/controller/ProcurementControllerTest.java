@@ -44,6 +44,10 @@ class ProcurementControllerTest {
         return new UserPrincipal(2L, "pekerja", "hash", "FIELD_STAFF");
     }
 
+    private UserPrincipal procurementPrincipal() {
+        return new UserPrincipal(3L, "proc", "hash", "PROCUREMENT");
+    }
+
     @Test
     @DisplayName("Field staff / supervisor can submit a new material request")
     void submitMaterialRequest_success() throws Exception {
@@ -90,6 +94,114 @@ class ProcurementControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Admin can approve a submitted material request")
+    void approveMaterialRequest_asAdmin_success() throws Exception {
+        MaterialRequest approved = MaterialRequest.builder()
+                .id(100L)
+                .status(MaterialRequestStatus.APPROVED)
+                .approvedBy(1L)
+                .approvalNote("ok")
+                .build();
+
+        when(procurementService.approveMaterialRequest(eq(100L), eq(1L), eq("ok"))).thenReturn(approved);
+
+        mockMvc.perform(post("/api/procurement/material-requests/100/approve")
+                        .with(user(adminPrincipal()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "note": "ok"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.message").value("Material request approved."))
+                .andExpect(jsonPath("$.data.status").value("APPROVED"));
+    }
+
+    @Test
+    @DisplayName("Admin can approve a material request without a note")
+    void approveMaterialRequest_withoutBody_success() throws Exception {
+        MaterialRequest approved = MaterialRequest.builder().id(100L).status(MaterialRequestStatus.APPROVED).build();
+
+        when(procurementService.approveMaterialRequest(eq(100L), eq(1L), eq(null))).thenReturn(approved);
+
+        mockMvc.perform(post("/api/procurement/material-requests/100/approve")
+                        .with(user(adminPrincipal())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("APPROVED"));
+    }
+
+    @Test
+    @DisplayName("Field staff is forbidden from approving material requests")
+    void approveMaterialRequest_asFieldStaff_forbidden() throws Exception {
+        mockMvc.perform(post("/api/procurement/material-requests/100/approve")
+                        .with(user(fieldStaffPrincipal())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PROCUREMENT role is forbidden from approving material requests (ADMIN-only, unlike its sibling endpoints)")
+    void approveMaterialRequest_asProcurement_forbidden() throws Exception {
+        mockMvc.perform(post("/api/procurement/material-requests/100/approve")
+                        .with(user(procurementPrincipal())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Admin can reject a submitted material request with a note")
+    void rejectMaterialRequest_withNote_success() throws Exception {
+        MaterialRequest rejected = MaterialRequest.builder()
+                .id(100L)
+                .status(MaterialRequestStatus.REJECTED)
+                .approvedBy(1L)
+                .approvalNote("Not in budget")
+                .build();
+
+        when(procurementService.rejectMaterialRequest(eq(100L), eq(1L), eq("Not in budget"))).thenReturn(rejected);
+
+        mockMvc.perform(post("/api/procurement/material-requests/100/reject")
+                        .with(user(adminPrincipal()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "note": "Not in budget"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Material request rejected."))
+                .andExpect(jsonPath("$.data.status").value("REJECTED"));
+    }
+
+    @Test
+    @DisplayName("Rejecting with a blank note returns 400 Bad Request")
+    void rejectMaterialRequest_blankNote_badRequest() throws Exception {
+        mockMvc.perform(post("/api/procurement/material-requests/100/reject")
+                        .with(user(adminPrincipal()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "note": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Field staff is forbidden from rejecting material requests")
+    void rejectMaterialRequest_asFieldStaff_forbidden() throws Exception {
+        mockMvc.perform(post("/api/procurement/material-requests/100/reject")
+                        .with(user(fieldStaffPrincipal()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "note": "no"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
     }
 
     @Test

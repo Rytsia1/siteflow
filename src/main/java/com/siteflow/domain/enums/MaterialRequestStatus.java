@@ -4,6 +4,7 @@ public enum MaterialRequestStatus {
     DRAFT,
     SUBMITTED,
     APPROVED,
+    REJECTED,
     PO_CREATED,
     COMPLETED
 }

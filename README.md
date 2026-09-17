@@ -53,7 +53,7 @@ All features below are implemented in the current codebase (backend + frontend),
 | **Approval workflow** | Every borrow request is created in a `PENDING_APPROVAL` state. An admin dashboard (`ApprovalDashboard.vue`) lists pending requests and lets an admin approve or reject them; rejection requires a mandatory note. |
 | **Asset tracking (individual tool instances)** | Physical tools can be registered as individually tracked `item_instances` with a unique serial number and QR code value. A scanner-style UI (`AssetScanner.vue`) checks tools out against an approved borrow request and processes returns with a condition inspection (`GOOD` / `NEEDS_REPAIR` / `BROKEN`). |
 | **Material requests** | Workers/supervisors submit a material request with one or more line items (item + quantity) and a justification. |
-| **Procurement / purchase orders** | Admins can list approved material requests and generate a purchase order from one, which auto-generates a PO number and issues the order. *(See Development Notes — the request-approval step itself is implemented at the service layer but not yet exposed as an API endpoint.)* |
+| **Procurement / purchase orders** | An admin can approve or reject a submitted material request (rejection requires a mandatory note), and can list approved requests and generate a purchase order from one, which auto-generates a PO number and issues the order. |
 | **Analytics dashboard** | Read-only aggregation layer over the transaction log and stock tables: dashboard summary metrics, low-stock detection, monthly consumption trends for consumables, tool utilization (borrowed vs. owned), and a simple moving-average demand forecast per item, with a reorder-recommendation report that can draft a material request directly from the UI. |
 
 ## Core Workflows
@@ -87,7 +87,8 @@ sequenceDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> SUBMITTED: POST /api/procurement/material-requests
-    SUBMITTED --> APPROVED: approveMaterialRequest()\n(service layer only — no endpoint yet)
+    SUBMITTED --> APPROVED: POST /api/procurement/material-requests/{id}/approve
+    SUBMITTED --> REJECTED: POST /api/procurement/material-requests/{id}/reject
     APPROVED --> PO_CREATED: POST /api/procurement/material-requests/{id}/generate-po
     PO_CREATED --> COMPLETED: markMaterialRequestCompleted()\n(service layer only — no endpoint yet)
 
@@ -210,7 +211,7 @@ siteflow/
 
 ## Database
 
-The schema is defined entirely through Flyway migrations (`src/main/resources/db/migration/V1__init_schema.sql` through `V5__v2_management_schema.sql`). All tables use `BIGINT UNSIGNED` surrogate keys and `InnoDB`/`utf8mb4`.
+The schema is defined entirely through Flyway migrations (`src/main/resources/db/migration/V1__init_schema.sql` through `V7__material_request_approval_audit.sql`). All tables use `BIGINT UNSIGNED` surrogate keys and `InnoDB`/`utf8mb4`.
 
 ```mermaid
 erDiagram
@@ -331,6 +332,8 @@ All endpoints are under `/api`, secured with HTTP Basic auth, and return the sta
 | Asset tracking | `POST /api/assets/return` | ADMIN, WAREHOUSE_STAFF |
 | Procurement | `GET /api/procurement/material-requests?status=` | ADMIN, PROCUREMENT* |
 | Procurement | `POST /api/procurement/material-requests` | ADMIN, FIELD_STAFF, WAREHOUSE_STAFF |
+| Procurement | `POST /api/procurement/material-requests/{id}/approve` | ADMIN |
+| Procurement | `POST /api/procurement/material-requests/{id}/reject` | ADMIN |
 | Procurement | `POST /api/procurement/material-requests/{id}/generate-po` | ADMIN, PROCUREMENT* |
 | Analytics | `GET /api/analytics/summary` | ADMIN |
 | Analytics | `GET /api/analytics/low-stock` | ADMIN |
@@ -360,7 +363,7 @@ Current coverage is a context-load smoke test (`SiteflowApplicationTests`) plus 
 
 The following are explicitly **not** implemented yet and are listed here so they aren't mistaken for existing functionality:
 
-- **Material request approval / completion endpoints.** `ProcurementService.approveMaterialRequest()` (SUBMITTED → APPROVED) and `markMaterialRequestCompleted()` (PO_CREATED → COMPLETED) exist at the service layer but are not wired to any controller endpoint.
+- **Material request completion endpoint.** `ProcurementService.markMaterialRequestCompleted()` (PO_CREATED → COMPLETED) exists at the service layer but is not wired to any controller endpoint. (Approval/rejection, SUBMITTED → APPROVED/REJECTED, is implemented and exposed.)
 - **Manual stock adjustments.** The `stock_adjustments` table, `StockAdjustment` domain entity, and `AdjustmentType` enum exist in the schema/codebase, but there is no mapper, service, or REST endpoint for creating adjustments.
 - **A dedicated `PROCUREMENT` role.** Referenced in `@PreAuthorize` annotations but not yet seeded or assignable through any UI/API.
 - **Automated frontend testing** (e.g. Vitest for unit tests, Playwright/Cypress for E2E).
@@ -374,7 +377,7 @@ No license has been specified for this repository. All rights reserved by defaul
 
 ## Development Notes
 
-- **Flyway** manages the schema end-to-end: `V1__init_schema.sql` (core MVP schema), `V2__seed_reference_data.sql` (roles), `V3__seed_users.sql` (dev accounts), `V4__seed_sample_data.sql` (sample items/locations/stock), `V5__v2_management_schema.sql` (asset tracking, approval workflow columns, procurement pipeline). `baseline-on-migrate` is enabled and migrations run automatically on application startup — there is no manual migration step.
+- **Flyway** manages the schema end-to-end: `V1__init_schema.sql` (core MVP schema), `V2__seed_reference_data.sql` (roles), `V3__seed_users.sql` (dev accounts), `V4__seed_sample_data.sql` (sample items/locations/stock), `V5__v2_management_schema.sql` (asset tracking, approval workflow columns, procurement pipeline), `V6__improve_schema_integrity_and_indexes.sql` (borrow request timestamps, analytics index), `V7__material_request_approval_audit.sql` (material request approval audit columns and REJECTED status). `baseline-on-migrate` is enabled and migrations run automatically on application startup — there is no manual migration step.
 - **MyBatis** is used exclusively (no JPA/Hibernate). Simple CRUD mappers use `@Select`/`@Insert`/`@Update` with `map-underscore-to-camel-case: true`; multi-table read views use `@ConstructorArgs`/`@Arg` to project joined query results directly into Java records (e.g. `ItemSummaryView`, `BorrowRequestView`) without an ORM layer in between.
 - **Spring Security** is configured as fully stateless (`SessionCreationPolicy.STATELESS`) with HTTP Basic and CSRF disabled, since there is no server-side session or cookie-based flow — every request re-authenticates against the database via a custom `UserDetailsService`. Method-level authorization uses `@EnableMethodSecurity` with `@PreAuthorize` on every controller method.
 - **Transactional workflows**: multi-step writes (creating a borrow request across several items, submitting a material request with line items, generating a purchase order) are wrapped in a single `@Transactional` service method so a failure partway through rolls back the entire operation rather than leaving partial rows.

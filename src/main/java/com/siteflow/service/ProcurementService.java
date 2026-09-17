@@ -23,7 +23,8 @@ import com.siteflow.web.dto.MaterialRequestView;
  *
  * MR lifecycle (managed by this service):
  *   DRAFT → SUBMITTED      (submitMaterialRequest)
- *   SUBMITTED → APPROVED   (approveMaterialRequest — admin action, separate concern)
+ *   SUBMITTED → APPROVED   (approveMaterialRequest — admin decision)
+ *   SUBMITTED → REJECTED   (rejectMaterialRequest — admin decision, terminal)
  *   APPROVED → PO_CREATED  (generatePurchaseOrder)
  *   PO_CREATED → COMPLETED (markMaterialRequestCompleted — when goods are received)
  *
@@ -115,18 +116,35 @@ public class ProcurementService {
      * <p>Transition: SUBMITTED → APPROVED
      *
      * <p>Only SUBMITTED requests can be approved; a DRAFT was never submitted for
-     * review and should not bypass the queue.
+     * review and should not bypass the queue, and an already APPROVED/REJECTED/
+     * PO_CREATED/COMPLETED request cannot be approved again.
      *
-     * @param mrId the id of the material request to approve
+     * @param mrId    the id of the material request to approve
+     * @param adminId the user id of the approving admin, recorded for audit
+     * @param note    optional approval note
      * @return the updated MaterialRequest
      */
     @Transactional
-    public MaterialRequest approveMaterialRequest(Long mrId) {
-        requireMrInStatus(mrId, MaterialRequestStatus.SUBMITTED);
+    public MaterialRequest approveMaterialRequest(Long mrId, Long adminId, String note) {
+        return transitionApproval(mrId, adminId, note, MaterialRequestStatus.APPROVED);
+    }
 
-        // Transition: SUBMITTED → APPROVED — request is now eligible for a PO
-        updateMrStatusOrThrow(mrId, MaterialRequestStatus.SUBMITTED, MaterialRequestStatus.APPROVED);
-        return materialRequestMapper.findById(mrId);
+    /**
+     * Rejects an existing material request. Terminal: a rejected request cannot be
+     * approved later or otherwise re-enter the pipeline — the requester submits a new
+     * material request if the need still stands (submitMaterialRequest always inserts
+     * a fresh row, so nothing more is needed to support that).
+     *
+     * <p>Transition: SUBMITTED → REJECTED
+     *
+     * @param mrId    the id of the material request to reject
+     * @param adminId the user id of the rejecting admin, recorded for audit
+     * @param note    reason for rejection — required so the requester can act on it
+     * @return the updated MaterialRequest
+     */
+    @Transactional
+    public MaterialRequest rejectMaterialRequest(Long mrId, Long adminId, String note) {
+        return transitionApproval(mrId, adminId, note, MaterialRequestStatus.REJECTED);
     }
 
     /**
@@ -226,6 +244,29 @@ public class ProcurementService {
             throw new IllegalStateException(
                     "Material request " + mrId + " was concurrently modified and is no longer " + expected + ".");
         }
+    }
+
+    /**
+     * Shared SUBMITTED → {approved|rejected} transition used by both approveMaterialRequest
+     * and rejectMaterialRequest, since the only difference between the two is which target
+     * status is written.
+     *
+     * <p>The pre-check gives a precise "must be SUBMITTED" message for the common case; the
+     * atomic conditional UPDATE (matched by affected-row count) is what actually prevents two
+     * concurrent decisions on the same request from both succeeding, in case the request
+     * changed between the check and the write.
+     */
+    private MaterialRequest transitionApproval(Long mrId, Long adminId, String note, MaterialRequestStatus newStatus) {
+        requireMrInStatus(mrId, MaterialRequestStatus.SUBMITTED);
+
+        int updated = materialRequestMapper.updateApproval(
+                mrId, MaterialRequestStatus.SUBMITTED, newStatus, adminId, note);
+        if (updated == 0) {
+            throw new IllegalStateException(
+                    "Material request " + mrId + " was concurrently modified and is no longer SUBMITTED.");
+        }
+
+        return materialRequestMapper.findById(mrId);
     }
 
     /**
