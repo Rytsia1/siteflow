@@ -70,9 +70,9 @@ public class JwtTokenProvider {
                     .parseSignedClaims(token);
             return true;
         } catch (ExpiredJwtException ex) {
-            log.warn("Expired JWT token: {}", ex.getMessage());
+            log.warn("Expired JWT token presented");
         } catch (JwtException | IllegalArgumentException ex) {
-            log.warn("Invalid JWT token: {}", ex.getMessage());
+            log.warn("Invalid JWT token presented: {}", ex.getClass().getSimpleName());
         }
         return false;
     }

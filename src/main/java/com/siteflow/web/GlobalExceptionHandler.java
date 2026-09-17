@@ -153,6 +153,13 @@ public class GlobalExceptionHandler {
         return buildError(HttpStatus.UNAUTHORIZED, "Invalid username or password.", request);
     }
 
+    /** Rate limiting / repeated authentication failure lockout. */
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiResponse<ErrorDetails>> handleTooManyRequests(
+            TooManyRequestsException ex, HttpServletRequest request) {
+        return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
+    }
+
     /** Unparseable/malformed @RequestBody JSON. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<ErrorDetails>> handleMalformedRequest(

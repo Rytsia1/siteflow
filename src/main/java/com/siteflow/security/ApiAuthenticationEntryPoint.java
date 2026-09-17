@@ -14,6 +14,7 @@ import com.siteflow.web.ErrorDetails;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Authentication entry point for unauthenticated requests rejecting missing or invalid Bearer tokens.
@@ -21,6 +22,7 @@ import jakarta.servlet.http.HttpServletResponse;
  * chain before the request ever reaches a controller, returning the standard
  * ApiResponse/ErrorDetails envelope.
  */
+@Slf4j
 @Component
 public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
@@ -33,6 +35,7 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException)
             throws IOException {
+        log.warn("Unauthenticated access attempt on {} from IP: {}", request.getRequestURI(), request.getRemoteAddr());
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         // Send the standard Bearer challenge header for stateless JWT authentication.
