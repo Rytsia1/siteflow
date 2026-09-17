@@ -242,7 +242,7 @@ Key entities:
 - **`item_instances`** — individually tracked physical tools (serial number, QR code, `tool_condition`), added in the V2 schema for asset tracking.
 - **`borrow_requests` / `borrow_items`** — a request header plus one row per borrowed item, with `qty_borrowed`/`qty_returned` tracked per line; the header carries both a fulfillment `status` (`PENDING` / `BORROWED` / `PARTIAL_RETURN` / `COMPLETED`) and an `approval_status` (`PENDING_APPROVAL` / `APPROVED` / `REJECTED`).
 - **`transaction_logs`** — an append-only ledger of every stock-affecting movement (`BORROW`, `RETURN`, `ADJUSTMENT`) with a signed `qty_change`; this is the single source of truth the analytics module reads from.
-- **`stock_adjustments`** — schema for manual IN/OUT stock corrections (see [Roadmap](#roadmap-planned--not-implemented) — no service/API layer exists for this table yet).
+- **`stock_adjustments`** — manual IN/OUT stock corrections, each one also recorded as an `ADJUSTMENT` row in `transaction_logs`.
 - **`material_requests` / `material_request_items` / `purchase_orders`** — the procurement pipeline described above.
 
 ## Setup Requirements
@@ -330,6 +330,7 @@ All endpoints are under `/api`, secured with HTTP Basic auth, and return the sta
 | Approvals | `POST /api/approvals/borrow-requests/{id}/reject` | ADMIN |
 | Asset tracking | `POST /api/assets/checkout` | ADMIN, WAREHOUSE_STAFF |
 | Asset tracking | `POST /api/assets/return` | ADMIN, WAREHOUSE_STAFF |
+| Stock adjustments | `POST /api/stock-adjustments` | ADMIN, WAREHOUSE_STAFF |
 | Procurement | `GET /api/procurement/material-requests?status=` | ADMIN, PROCUREMENT* |
 | Procurement | `POST /api/procurement/material-requests` | ADMIN, FIELD_STAFF, WAREHOUSE_STAFF |
 | Procurement | `POST /api/procurement/material-requests/{id}/approve` | ADMIN |
@@ -364,7 +365,6 @@ Current coverage is a context-load smoke test (`SiteflowApplicationTests`) plus 
 The following are explicitly **not** implemented yet and are listed here so they aren't mistaken for existing functionality:
 
 - **Material request completion endpoint.** `ProcurementService.markMaterialRequestCompleted()` (PO_CREATED → COMPLETED) exists at the service layer but is not wired to any controller endpoint. (Approval/rejection, SUBMITTED → APPROVED/REJECTED, is implemented and exposed.)
-- **Manual stock adjustments.** The `stock_adjustments` table, `StockAdjustment` domain entity, and `AdjustmentType` enum exist in the schema/codebase, but there is no mapper, service, or REST endpoint for creating adjustments.
 - **A dedicated `PROCUREMENT` role.** Referenced in `@PreAuthorize` annotations but not yet seeded or assignable through any UI/API.
 - **Automated frontend testing** (e.g. Vitest for unit tests, Playwright/Cypress for E2E).
 - **CI pipeline** (no GitHub Actions workflow currently exists in this repository).
