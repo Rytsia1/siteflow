@@ -239,11 +239,7 @@ public class ProcurementService {
      * that status by another request between this method's pre-check and this write).
      */
     private void updateMrStatusOrThrow(Long mrId, MaterialRequestStatus expected, MaterialRequestStatus newStatus) {
-        int updated = materialRequestMapper.updateStatus(mrId, expected, newStatus);
-        if (updated == 0) {
-            throw new IllegalStateException(
-                    "Material request " + mrId + " was concurrently modified and is no longer " + expected + ".");
-        }
+        assertRowsUpdated(materialRequestMapper.updateStatus(mrId, expected, newStatus), mrId, expected);
     }
 
     /**
@@ -261,12 +257,21 @@ public class ProcurementService {
 
         int updated = materialRequestMapper.updateApproval(
                 mrId, MaterialRequestStatus.SUBMITTED, newStatus, adminId, note);
-        if (updated == 0) {
-            throw new IllegalStateException(
-                    "Material request " + mrId + " was concurrently modified and is no longer SUBMITTED.");
-        }
+        assertRowsUpdated(updated, mrId, MaterialRequestStatus.SUBMITTED);
 
         return materialRequestMapper.findById(mrId);
+    }
+
+    /**
+     * Shared by every atomic conditional UPDATE above: throws if the write matched zero rows,
+     * meaning the MR was concurrently moved out of {@code expected} between the caller's
+     * pre-check and this write.
+     */
+    private void assertRowsUpdated(int updatedRows, Long mrId, MaterialRequestStatus expected) {
+        if (updatedRows == 0) {
+            throw new IllegalStateException(
+                    "Material request " + mrId + " was concurrently modified and is no longer " + expected + ".");
+        }
     }
 
     /**

@@ -83,8 +83,11 @@ async function approve(row) {
   try {
     await http.post(`/procurement/material-requests/${row.id}/approve`)
     ElMessage.success('Material request approved.')
-    // The approved request leaves Pending and belongs on the Approved tab now.
-    await Promise.all([loadPendingRequests(), loadApprovedRequests()])
+    // Move the row from Pending to Approved locally instead of re-fetching both
+    // lists — the columns both tables display (requesterName/justification/
+    // requestDate) don't change on approval, so no network round-trip is needed.
+    pendingRequests.value = pendingRequests.value.filter((r) => r.id !== row.id)
+    approvedRequests.value = [...approvedRequests.value, row]
   } catch {
     // interceptor already showed the error toast
   } finally {
@@ -109,7 +112,8 @@ async function submitReject() {
     })
     ElMessage.success('Material request rejected.')
     rejectDialogVisible.value = false
-    await loadPendingRequests()
+    // Rejected requests just drop off the Pending list — no re-fetch needed.
+    pendingRequests.value = pendingRequests.value.filter((r) => r.id !== rejectTarget.value.id)
   } catch {
     // interceptor already showed the error toast
   } finally {

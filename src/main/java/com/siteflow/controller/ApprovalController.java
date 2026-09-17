@@ -51,8 +51,8 @@ public class ApprovalController {
             @PathVariable Long id,
             @RequestBody(required = false) ApproveRequestDto dto,
             @AuthenticationPrincipal UserPrincipal principal) {
-        String note = (dto != null) ? dto.note() : null;
-        BorrowRequest approved = approvalService.approveBorrowRequest(id, principal.getUserId(), note);
+        BorrowRequest approved = approvalService.approveBorrowRequest(
+                id, principal.getUserId(), ApproveRequestDto.noteOf(dto));
         return ApiResponse.success("Borrow request approved.", approved);
     }
 

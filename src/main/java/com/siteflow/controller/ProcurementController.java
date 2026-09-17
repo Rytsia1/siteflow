@@ -82,8 +82,8 @@ public class ProcurementController {
             @PathVariable Long id,
             @RequestBody(required = false) ApproveRequestDto dto,
             @AuthenticationPrincipal UserPrincipal principal) {
-        String note = (dto != null) ? dto.note() : null;
-        MaterialRequest approved = procurementService.approveMaterialRequest(id, principal.getUserId(), note);
+        MaterialRequest approved = procurementService.approveMaterialRequest(
+                id, principal.getUserId(), ApproveRequestDto.noteOf(dto));
         return ApiResponse.success("Material request approved.", approved);
     }
 
