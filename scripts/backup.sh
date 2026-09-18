@@ -9,8 +9,9 @@ set -euo pipefail
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-3306}"
 DB_NAME="${DB_NAME:-siteflow}"
-DB_USER="${DB_USER:-root}"
+DB_USER="${DB_USER:-${DB_USERNAME:-siteflow_admin}}"
 DB_PASSWORD="${DB_PASSWORD:-}"
+DB_SSL_MODE="${DB_SSL_MODE:-PREFERRED}"
 BACKUP_DIR="${BACKUP_DIR:-backups}"
 
 mkdir -p "${BACKUP_DIR}"
@@ -18,7 +19,7 @@ mkdir -p "${BACKUP_DIR}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILE="${BACKUP_DIR}/siteflow_backup_${DB_NAME}_${TIMESTAMP}.sql"
 
-echo "[BACKUP] Starting backup for database '${DB_NAME}' on ${DB_HOST}:${DB_PORT}..."
+echo "[BACKUP] Starting backup for database '${DB_NAME}' on ${DB_HOST}:${DB_PORT} (User: ${DB_USER}, SSL: ${DB_SSL_MODE})..."
 
 if [ -n "${DB_PASSWORD}" ]; then
   export MYSQL_PWD="${DB_PASSWORD}"
@@ -30,6 +31,7 @@ mysqldump \
   --host="${DB_HOST}" \
   --port="${DB_PORT}" \
   --user="${DB_USER}" \
+  --ssl-mode="${DB_SSL_MODE}" \
   --single-transaction \
   --quick \
   --routines \

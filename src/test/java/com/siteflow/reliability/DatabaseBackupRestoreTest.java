@@ -46,7 +46,7 @@ class DatabaseBackupRestoreTest {
     static void cleanup() {
         // Clean up recovery test database
         try (Connection conn = DriverManager.getConnection(
-                "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC",
+                "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "?sslMode=PREFERRED&allowPublicKeyRetrieval=true&serverTimezone=UTC",
                 DB_USER, DB_PASSWORD);
              Statement stmt = conn.createStatement()) {
             stmt.executeUpdate("DROP DATABASE IF EXISTS " + TARGET_TEST_DB);
@@ -167,7 +167,7 @@ class DatabaseBackupRestoreTest {
     @DisplayName("3. Verify schema, Flyway migrations, and representative records in restored database")
     void testRestoredDatabaseIntegrityAndConnectivity() throws Exception {
         String recoveryJdbcUrl = "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/" + TARGET_TEST_DB
-                + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
+                + "?sslMode=PREFERRED&allowPublicKeyRetrieval=true&serverTimezone=UTC";
 
         try (Connection conn = DriverManager.getConnection(recoveryJdbcUrl, DB_USER, DB_PASSWORD);
              Statement stmt = conn.createStatement()) {

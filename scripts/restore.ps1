@@ -13,8 +13,9 @@ param(
     [string]$HostName = $(if ($env:DB_HOST) { $env:DB_HOST } else { "localhost" }),
     [int]$Port = $(if ($env:DB_PORT) { [int]$env:DB_PORT } else { 3306 }),
     [string]$TargetDatabase = $(if ($env:DB_NAME) { $env:DB_NAME } else { "siteflow" }),
-    [string]$User = $(if ($env:DB_USER) { $env:DB_USER } else { "root" }),
+    [string]$User = $(if ($env:DB_USER) { $env:DB_USER } elseif ($env:DB_USERNAME) { $env:DB_USERNAME } else { "siteflow_admin" }),
     [string]$Password = $env:DB_PASSWORD,
+    [string]$SslMode = $(if ($env:DB_SSL_MODE) { $env:DB_SSL_MODE } else { "PREFERRED" }),
     [string]$BackupDir = $(if ($env:BACKUP_DIR) { $env:BACKUP_DIR } else { "backups" }),
     [switch]$CleanDatabase,
     [switch]$Force
@@ -35,7 +36,7 @@ if (-not $BackupFile -or -not (Test-Path $BackupFile)) {
     exit 1
 }
 
-Write-Host "[RESTORE] Target Database: '$TargetDatabase' on ${HostName}:${Port}"
+Write-Host "[RESTORE] Target Database: '$TargetDatabase' on ${HostName}:${Port} (User: $User, SSL: $SslMode)"
 Write-Host "[RESTORE] Source Backup  : '$BackupFile'"
 
 if ($Password) {
@@ -51,7 +52,7 @@ try {
         }
         Write-Host "[RESTORE] Cleaning (dropping & recreating) target database '$TargetDatabase'..."
         $dropCreateSql = "DROP DATABASE IF EXISTS $TargetDatabase; CREATE DATABASE $TargetDatabase CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-        & mysql.exe --host=$HostName --port=$Port --user=$User -e $dropCreateSql
+        & mysql.exe --host=$HostName --port=$Port --user=$User --ssl-mode=$SslMode -e $dropCreateSql
         if ($LASTEXITCODE -ne 0) {
             Write-Error "[RESTORE FAILED] Could not create database '$TargetDatabase'"
             exit 1
@@ -59,7 +60,7 @@ try {
     } else {
         # Ensure database exists
         $createSql = "CREATE DATABASE IF NOT EXISTS $TargetDatabase CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-        & mysql.exe --host=$HostName --port=$Port --user=$User -e $createSql
+        & mysql.exe --host=$HostName --port=$Port --user=$User --ssl-mode=$SslMode -e $createSql
         if ($LASTEXITCODE -ne 0) {
             Write-Error "[RESTORE FAILED] Could not ensure database '$TargetDatabase' exists"
             exit 1
@@ -70,7 +71,7 @@ try {
     # Format path with forward slashes for MySQL source command
     $normalizedPath = ($BackupFile -replace '\\', '/')
     $sourceSql = "source $normalizedPath;"
-    & mysql.exe --host=$HostName --port=$Port --user=$User --database=$TargetDatabase -e $sourceSql
+    & mysql.exe --host=$HostName --port=$Port --user=$User --ssl-mode=$SslMode --database=$TargetDatabase -e $sourceSql
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "[RESTORE SUCCESS] Database '$TargetDatabase' successfully restored from '$BackupFile'."

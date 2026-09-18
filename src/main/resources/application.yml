@@ -2,8 +2,8 @@ spring:
   application:
     name: siteflow
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:siteflow}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: ${DB_USERNAME:root}
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:siteflow}?sslMode=${DB_SSL_MODE:VERIFY_IDENTITY}&allowPublicKeyRetrieval=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:false}&serverTimezone=UTC${DB_JDBC_PARAMS:}
+    username: ${DB_USERNAME:siteflow_app}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
@@ -12,6 +12,8 @@ spring:
       connection-timeout: 20000
   flyway:
     enabled: true
+    user: ${FLYWAY_DB_USERNAME:${DB_USERNAME:siteflow_migration}}
+    password: ${FLYWAY_DB_PASSWORD:${DB_PASSWORD}}
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: false

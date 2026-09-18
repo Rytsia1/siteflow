@@ -11,8 +11,9 @@ param(
     [string]$HostName = $(if ($env:DB_HOST) { $env:DB_HOST } else { "localhost" }),
     [int]$Port = $(if ($env:DB_PORT) { [int]$env:DB_PORT } else { 3306 }),
     [string]$Database = $(if ($env:DB_NAME) { $env:DB_NAME } else { "siteflow" }),
-    [string]$User = $(if ($env:DB_USER) { $env:DB_USER } else { "root" }),
+    [string]$User = $(if ($env:DB_USER) { $env:DB_USER } elseif ($env:DB_USERNAME) { $env:DB_USERNAME } else { "siteflow_admin" }),
     [string]$Password = $env:DB_PASSWORD,
+    [string]$SslMode = $(if ($env:DB_SSL_MODE) { $env:DB_SSL_MODE } else { "PREFERRED" }),
     [string]$BackupDir = $(if ($env:BACKUP_DIR) { $env:BACKUP_DIR } else { "backups" })
 )
 
@@ -23,12 +24,13 @@ if (-not (Test-Path $BackupDir)) {
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $backupFile = Join-Path $BackupDir "siteflow_backup_${Database}_${timestamp}.sql"
 
-Write-Host "[BACKUP] Starting backup for database '${Database}' on ${HostName}:${Port}..."
+Write-Host "[BACKUP] Starting backup for database '${Database}' on ${HostName}:${Port} (User: $User, SSL: $SslMode)..."
 
 $dumpArgs = @(
     "--host=$HostName",
     "--port=$Port",
     "--user=$User",
+    "--ssl-mode=$SslMode",
     "--single-transaction",
     "--quick",
     "--routines",

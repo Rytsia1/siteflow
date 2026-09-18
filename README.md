@@ -260,25 +260,46 @@ Key entities:
 
 `src/main/resources/application.yml` resolves every datasource and server setting from OS environment variables via `${VAR:default}` placeholders — no credentials are hardcoded or committed. Copy [`.env.example`](.env.example) for a documented list of what to set; Spring Boot does not load `.env` files itself, so export these in your shell profile, IDE run configuration, or process manager.
 
-| Variable | Default | Description |
+| Variable | Default (Production) | Description |
 |---|---|---|
 | `DB_HOST` | `localhost` | MySQL host |
 | `DB_PORT` | `3306` | MySQL port |
 | `DB_NAME` | `siteflow` | MySQL schema/database name |
-| `DB_USERNAME` | `root` | MySQL username |
-| `DB_PASSWORD` | *(none — required)* | MySQL password. The app fails to start with a clear error if this isn't set; there is deliberately no default. |
+| `DB_USERNAME` | `siteflow_app` | Dedicated application runtime DB user (restricted to DML: SELECT, INSERT, UPDATE, DELETE, EXECUTE) |
+| `DB_PASSWORD` | *(none — required)* | MySQL password for the application runtime user |
+| `FLYWAY_DB_USERNAME` | `siteflow_migration` | Dedicated migration DB user (granted DDL + DML privileges to execute Flyway migrations) |
+| `FLYWAY_DB_PASSWORD` | `${DB_PASSWORD}` | Password for the Flyway migration user |
+| `DB_SSL_MODE` | `VERIFY_IDENTITY` | MySQL TLS connection mode (`VERIFY_IDENTITY`, `VERIFY_CA`, `REQUIRED`). Production strictly enforces certificate and hostname validation. |
+| `DB_ALLOW_PUBLIC_KEY_RETRIEVAL` | `false` | RSA public key retrieval flag. Disallowed in production to prevent plaintext key transmission. |
+| `DB_JDBC_PARAMS` | *(empty)* | Optional JDBC connection parameters (e.g. `&trustCertificateKeyStoreUrl=...`) |
 | `SERVER_PORT` | `8080` | Port the Spring Boot application listens on |
 
 The frontend has its own, separate `.env.example` under [`frontend/`](frontend/.env.example) — see [Running Locally](#running-locally).
 
-Example local configuration:
+### Database Security & Least-Privilege Users
+
+SiteFlow separates database access into two distinct, least-privilege roles to enforce defense-in-depth:
+1. **Application Runtime User (`siteflow_app`)**: Restricted to DML operations (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `EXECUTE`). It cannot alter tables, drop databases, or modify schemas.
+2. **Migration User (`siteflow_migration`)**: Used exclusively by Flyway during application boot to apply structural migrations (`CREATE`, `ALTER`, `DROP`, `INDEX`, `REFERENCES`, `TRIGGER`).
+
+To provision these accounts on your MySQL server, execute the provided setup script:
 
 ```bash
-export DB_HOST=localhost
+mysql -u root -p < scripts/setup-least-privilege-users.sql
+```
+
+Example production configuration:
+
+```bash
+export DB_HOST=db.internal.siteflow.net
 export DB_PORT=3306
 export DB_NAME=siteflow
-export DB_USERNAME=root
-export DB_PASSWORD=your-local-mysql-password
+export DB_USERNAME=siteflow_app
+export DB_PASSWORD=SecretAppPassword123!
+export FLYWAY_DB_USERNAME=siteflow_migration
+export FLYWAY_DB_PASSWORD=SecretMigrationPassword123!
+export DB_SSL_MODE=VERIFY_IDENTITY
+export DB_ALLOW_PUBLIC_KEY_RETRIEVAL=false
 export SERVER_PORT=8080
 ```
 

@@ -2,7 +2,7 @@ spring:
   application:
     name: siteflow
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:siteflow}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:siteflow}?sslMode=${DB_SSL_MODE:PREFERRED}&allowPublicKeyRetrieval=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:true}&serverTimezone=UTC${DB_JDBC_PARAMS:}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -12,6 +12,8 @@ spring:
       connection-timeout: 20000
   flyway:
     enabled: true
+    user: ${FLYWAY_DB_USERNAME:${DB_USERNAME:root}}
+    password: ${FLYWAY_DB_PASSWORD:${DB_PASSWORD:}}
     locations: classpath:db/migration,classpath:db/test-fixtures
     baseline-on-migrate: true
     validate-on-migrate: false

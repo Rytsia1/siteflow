@@ -4,8 +4,19 @@
 # Activated with:
 #   SPRING_PROFILES_ACTIVE=dev
 #   mvn spring-boot:run -Dspring-boot.run.profiles=dev
+#
+# Development-specific settings for local convenience:
+# - sslMode defaults to PREFERRED (allows connecting to local dev MySQL without CA certs)
+# - allowPublicKeyRetrieval defaults to true for local development
+# - username defaults to root for local scratch databases (production defaults to siteflow_app)
 # =========================================================================
 
 spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:siteflow}?sslMode=${DB_SSL_MODE:PREFERRED}&allowPublicKeyRetrieval=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:true}&serverTimezone=UTC${DB_JDBC_PARAMS:}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
   flyway:
+    user: ${FLYWAY_DB_USERNAME:${DB_USERNAME:root}}
+    password: ${FLYWAY_DB_PASSWORD:${DB_PASSWORD:}}
     locations: classpath:db/migration,classpath:db/dev-seed
