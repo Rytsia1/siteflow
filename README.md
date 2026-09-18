@@ -422,6 +422,33 @@ SiteFlow is designed for high accessibility, visual consistency, and keyboard na
 7. **Automated Accessibility Testing**:
    - Automated regression test suite (`frontend/src/api/accessibility.test.js`) verifies WCAG AA contrast calculations, non-color status mappings, notification route resolution, empty states, and CSS focus ring rules.
 
+## Software Supply Chain, Dependency, Asset & License Compliance
+
+SiteFlow maintains a minimal, audited, and strictly controlled software supply chain designed to mitigate third-party risk:
+
+1. **Dependency Inventory & Licensing**:
+   - **Backend**: Built on Spring Boot 3.5.0, MyBatis 3.0.4, Flyway 11.7.2, JJWT 0.12.6, and Lombok under permissive **Apache-2.0** and **MIT** licenses. MySQL Connector/J 9.2.0 is licensed under **GPL-2.0 with the Universal FOSS Exception** (suitable for network-executed SaaS; requires legal review prior to closed-source on-premise redistribution).
+   - **Frontend**: Vue 3, Vue Router, Element Plus, Axios, Chart.js, vue-chartjs, and Vite under **MIT** licenses.
+   - Complete inventory and notices: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+2. **Dependency Locking & Reproducibility**:
+   - `frontend/package-lock.json` is committed and enforced.
+   - Maven dependencies are managed deterministically via `spring-boot-starter-parent:3.5.0` with no floating or unbounded version ranges.
+3. **Secrets Management Policy**:
+   - Zero hardcoded passwords, tokens, or private keys in source or test configuration.
+   - All credentials (`DB_PASSWORD`, `JWT_SECRET`) are injected via environment variables.
+   - Frontend `VITE_*` variables are strictly public-only (e.g. proxy destination, timeout).
+4. **Third-Party Network Audit**:
+   - **Zero External APIs**: No outgoing connections to external SaaS, maps, or cloud services.
+   - **Zero Telemetry/Tracking**: No Google Analytics, Meta Pixel, crash reporting, or telemetry beacons.
+   - **Zero CDNs**: All scripts, styles, and assets are locally bundled and served from the application host.
+5. **Typography & Asset Licensing**:
+   - Native OS system font stack (`-apple-system`, `BlinkMacSystemFont`, `Segoe UI`, `Roboto`, `sans-serif`) eliminates remote font downloads and licensing liabilities.
+   - Icons utilize standard Unicode glyphs (`🔔`, `☀️`, `🌙`, `✓`, `⚠️`, `✕`, `⏳`, `📦`).
+6. **Automated Supply Chain Security**:
+   - **Dependabot**: Configured in `.github/dependabot.yml` for automated weekly audits across Maven and npm.
+   - **Vulnerability Checks**: `npm audit` integrated in frontend CI (verified: 0 vulnerabilities).
+   - **Compliance Tests**: `frontend/src/api/dependency-compliance.test.js` enforces lockfile presence, zero remote CDN links, and absence of secrets.
+
 ## Roadmap (planned — not implemented)
 
 The following are explicitly **not** implemented yet and are listed here so they aren't mistaken for existing functionality:

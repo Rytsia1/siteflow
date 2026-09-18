@@ -39,7 +39,21 @@ desktop.ini
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
 frontend/*.local
+!frontend/.env.example
+
+### AI & Assistant Tooling ###
+.claude/
+.agents/
+
+### Certificates & Keys ###
+*.pem
+*.key
+*.p12
+*.jks
 
 ### Backups and SQL Dumps ###
 backups/

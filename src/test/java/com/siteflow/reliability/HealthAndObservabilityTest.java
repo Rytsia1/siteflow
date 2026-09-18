@@ -138,7 +138,10 @@ class HealthAndObservabilityTest {
 
         String content = result.getResponse().getContentAsString();
         assertThat(content).doesNotContain("secret-pwd-attempt");
-        assertThat(content).doesNotContain("Shizukusan");
+        String envDbPassword = System.getenv("DB_PASSWORD");
+        if (envDbPassword != null && !envDbPassword.isBlank()) {
+            assertThat(content).doesNotContain(envDbPassword);
+        }
         assertThat(content).doesNotContain("root");
         assertThat(content).doesNotContain("Exception");
         assertThat(content).doesNotContain("at com.siteflow");

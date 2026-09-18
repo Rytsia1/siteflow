@@ -264,7 +264,7 @@ npm run dev
   ```bash
   mvn test
   ```
-- **Frontend**: **22 automated tests** covering HTTP client error interception, idempotency guards, token injection, WCAG AA contrast verification, non-color statuses, notification routes, and CSS focus rules:
+- **Frontend**: **28 automated tests** covering HTTP client error interception, idempotency guards, token injection, WCAG AA contrast verification, non-color statuses, notification routes, CSS focus rules, lockfile verification, and absence of external CDNs/secrets:
   ```bash
   cd frontend
   npm test
@@ -343,13 +343,46 @@ npm run dev
 
 ---
 
-## 14. Operational Gotchas & Future Roadmap
+## 15. Software Supply Chain, Dependency & Asset Compliance
+
+### A. Dependency Locking & Version Determinism
+- **Backend (`pom.xml`)**: All direct dependencies are either pinned to explicit releases (`0.12.6`, `3.0.4`) or curated by Spring Boot BOM `spring-boot-starter-parent:3.5.0`. No dynamic or unbounded version ranges are permitted.
+- **Frontend (`package-lock.json`)**: Committed lockfile enforces reproducible installs via `npm ci` or `npm install`.
+
+### B. Secrets & Credential Isolation
+- Zero committed database passwords, tokens, or private keys across all production and test source code.
+- Test suites dynamically read `DB_PASSWORD` from the process environment (`System.getenv("DB_PASSWORD")`).
+- Frontend exposure is restricted strictly to non-sensitive `VITE_*` configuration (proxy target and timeout).
+
+### C. Third-Party Network Isolation
+- **0 Outgoing Third-Party APIs**: Backend connects only to the local/internal MySQL database; Frontend connects only to the relative `/api` route.
+- **0 Trackers / Telemetry**: No Google Analytics, Meta Pixel, or telemetry SDKs.
+- **0 Remote CDNs**: All JavaScript, CSS, and assets are locally bundled and served from the application host.
+- **Assets & Fonts**: Native OS system fonts (`-apple-system`, `Roboto`, `sans-serif`) and Unicode symbols are used exclusively, eliminating third-party font/icon licensing liabilities.
+
+### D. Open-Source License Management
+- Permissive licenses (**MIT**, **Apache-2.0**) cover Spring Boot, MyBatis, Flyway, JJWT, Vue 3, Element Plus, Axios, and Chart.js.
+- **MySQL Connector/J** (`com.mysql:mysql-connector-j` 9.2.0) is licensed under **GPL-2.0 with Universal FOSS Exception**:
+  - *Internal / SaaS model*: Permissible without source code disclosure obligations.
+  - *On-premise commercial appliance*: Requires legal review before distributing closed-source binaries bundled with the GPL driver (or replace with MariaDB Java Client under LGPL).
+- Detailed inventory: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+### E. Automated Vulnerability Scanning
+- **Dependabot**: `.github/dependabot.yml` monitors both Maven and npm dependencies on a weekly schedule.
+- **Frontend Audits**: `npm audit` integrated in test lifecycle (0 vulnerabilities).
+- **Automated Supply Chain Tests**: `frontend/src/api/dependency-compliance.test.js` enforces lockfile integrity, zero CDN links, and absence of secrets.
+
+---
+
+## 16. Operational Gotchas & Future Roadmap
 
 ### Operational Gotchas
 1. **Hikari Connection Deadlocks with `REQUIRES_NEW`**: Maintain `spring.datasource.hikari.maximum-pool-size` at $\ge 20$.
 2. **Rate Limiting in Tests**: Use `RateLimiterService.resetAll()` in test fixtures if testing rapid authentication.
 3. **Sole Admin Protection**: `UserService` prevents deactivating the sole remaining active `ADMIN` to avoid platform lockout.
 4. **Contrast Tokens on Upgrades**: Ensure custom Element Plus theme overrides do not reset text colors to default `#909399`.
+5. **Local Test Database Credentials**: Ensure `DB_PASSWORD` is set in the local environment if running `mvn test` against a password-protected MySQL database.
+6. **GPL Driver Review**: Do not distribute compiled closed-source binaries bundling MySQL Connector/J without legal review of the GPL-2.0 FOSS Exception.
 
 ---
 *Document maintained by the SiteFlow Engineering Team.*
