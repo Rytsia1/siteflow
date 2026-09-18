@@ -48,11 +48,13 @@ public class JwtTokenProvider {
     public String generateToken(UserPrincipal principal, long customExpirationMs) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + customExpirationMs);
+        Integer tokenVersion = principal.getTokenVersion() != null ? principal.getTokenVersion() : 1;
 
         return Jwts.builder()
                 .subject(principal.getUsername())
                 .claim("userId", principal.getUserId())
                 .claim("role", principal.getRoleName())
+                .claim("tokenVersion", tokenVersion)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(key, Jwts.SIG.HS256)
@@ -83,8 +85,9 @@ public class JwtTokenProvider {
         Number userIdNumber = claims.get("userId", Number.class);
         Long userId = userIdNumber != null ? userIdNumber.longValue() : null;
         String role = claims.get("role", String.class);
+        Integer tokenVersion = claims.get("tokenVersion", Integer.class);
 
-        UserPrincipal principal = new UserPrincipal(userId, username, "", role);
+        UserPrincipal principal = new UserPrincipal(userId, username, "", role, true, tokenVersion != null ? tokenVersion : 1);
         return new UsernamePasswordAuthenticationToken(principal, token, principal.getAuthorities());
     }
 
@@ -94,6 +97,13 @@ public class JwtTokenProvider {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    public Integer getTokenVersion(Claims claims) {
+        if (claims == null) {
+            return null;
+        }
+        return claims.get("tokenVersion", Integer.class);
     }
 
     public long getExpirationMs() {

@@ -57,6 +57,30 @@ class DataPrivacyAndGovernanceTest {
         return jwtTokenProvider.generateToken(new UserPrincipal(userId, username, "", role));
     }
 
+    @org.junit.jupiter.api.BeforeEach
+    void setUpUserMapper() {
+        when(userMapper.findUserWithRoleById(any())).thenAnswer(inv -> {
+            Long id = inv.getArgument(0);
+            return UserWithRole.builder()
+                    .id(id)
+                    .username(id == 1L ? "admin" : (id == 5L ? "worker_dan" : (id == 25L ? "worker_leaving" : "user_" + id)))
+                    .roleName(id == 1L ? "ADMIN" : "FIELD_STAFF")
+                    .isActive(true)
+                    .tokenVersion(1)
+                    .build();
+        });
+        when(userMapper.findByUsername(any())).thenAnswer(inv -> {
+            String uname = inv.getArgument(0);
+            return UserWithRole.builder()
+                    .id(1L)
+                    .username(uname)
+                    .roleName("admin".equals(uname) ? "ADMIN" : "FIELD_STAFF")
+                    .isActive(!"deactivated_worker".equals(uname))
+                    .tokenVersion(1)
+                    .build();
+        });
+    }
+
     // =========================================================================
     // 1. SENSITIVE DATA EXPOSURE AUDIT
     // =========================================================================

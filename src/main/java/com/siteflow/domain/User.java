@@ -19,6 +19,7 @@ public class User {
     private String fullName;
     private String jobPosition;
     private Boolean isActive;
+    private Integer tokenVersion;
     private LocalDateTime deactivatedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

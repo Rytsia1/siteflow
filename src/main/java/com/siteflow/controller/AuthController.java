@@ -38,6 +38,7 @@ public class AuthController {
     private final LoginAttemptService loginAttemptService;
     private final RateLimitProperties rateLimitProperties;
     private final com.siteflow.service.AuditService auditService;
+    private final com.siteflow.service.UserService userService;
 
     @org.springframework.beans.factory.annotation.Autowired
     public AuthController(
@@ -45,12 +46,23 @@ public class AuthController {
             JwtTokenProvider jwtTokenProvider,
             LoginAttemptService loginAttemptService,
             RateLimitProperties rateLimitProperties,
-            com.siteflow.service.AuditService auditService) {
+            com.siteflow.service.AuditService auditService,
+            com.siteflow.service.UserService userService) {
         this.authenticationManager = authenticationManager;
         this.jwtTokenProvider = jwtTokenProvider;
         this.loginAttemptService = loginAttemptService;
         this.rateLimitProperties = rateLimitProperties;
         this.auditService = auditService;
+        this.userService = userService;
+    }
+
+    public AuthController(
+            AuthenticationManager authenticationManager,
+            JwtTokenProvider jwtTokenProvider,
+            LoginAttemptService loginAttemptService,
+            RateLimitProperties rateLimitProperties,
+            com.siteflow.service.AuditService auditService) {
+        this(authenticationManager, jwtTokenProvider, loginAttemptService, rateLimitProperties, auditService, null);
     }
 
     public AuthController(
@@ -58,7 +70,7 @@ public class AuthController {
             JwtTokenProvider jwtTokenProvider,
             LoginAttemptService loginAttemptService,
             RateLimitProperties rateLimitProperties) {
-        this(authenticationManager, jwtTokenProvider, loginAttemptService, rateLimitProperties, null);
+        this(authenticationManager, jwtTokenProvider, loginAttemptService, rateLimitProperties, null, null);
     }
 
     /**
@@ -118,6 +130,18 @@ public class AuthController {
     public ApiResponse<CurrentUserView> me(@AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success("Current user.",
                 new CurrentUserView(principal.getUserId(), principal.getUsername(), principal.getRoleName()));
+    }
+
+    /**
+     * Invalidates all active tokens for the authenticated caller by incrementing their token version.
+     */
+    @PostMapping("/logout")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<Void> logout(@AuthenticationPrincipal UserPrincipal principal) {
+        if (userService != null && principal != null && principal.getUserId() != null) {
+            userService.revokeUserTokens(principal.getUserId());
+        }
+        return ApiResponse.success("Successfully logged out. All active sessions have been invalidated.", null);
     }
 
     private String resolveClientIp(HttpServletRequest request) {

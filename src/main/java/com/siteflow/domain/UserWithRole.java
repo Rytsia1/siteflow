@@ -15,4 +15,5 @@ public class UserWithRole {
     private String passwordHash;
     private String roleName;
     private Boolean isActive;
+    private Integer tokenVersion;
 }

@@ -27,6 +27,6 @@ public class DbUserDetailsService implements UserDetailsService {
         if (Boolean.FALSE.equals(user.getIsActive())) {
             throw new DisabledException("User account is deactivated.");
         }
-        return new UserPrincipal(user.getId(), user.getUsername(), user.getPasswordHash(), user.getRoleName());
+        return new UserPrincipal(user.getId(), user.getUsername(), user.getPasswordHash(), user.getRoleName(), user.getIsActive(), user.getTokenVersion());
     }
 }

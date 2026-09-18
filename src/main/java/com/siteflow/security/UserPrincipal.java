@@ -13,15 +13,21 @@ public class UserPrincipal extends User {
 
     private final Long userId;
     private final String roleName;
+    private final Integer tokenVersion;
 
     public UserPrincipal(Long userId, String username, String passwordHash, String roleName) {
-        this(userId, username, passwordHash, roleName, true);
+        this(userId, username, passwordHash, roleName, true, 1);
     }
 
     public UserPrincipal(Long userId, String username, String passwordHash, String roleName, boolean enabled) {
+        this(userId, username, passwordHash, roleName, enabled, 1);
+    }
+
+    public UserPrincipal(Long userId, String username, String passwordHash, String roleName, boolean enabled, Integer tokenVersion) {
         super(username, passwordHash, enabled, true, true, true, authorities(roleName));
         this.userId = userId;
         this.roleName = roleName;
+        this.tokenVersion = tokenVersion != null ? tokenVersion : 1;
     }
 
     private static List<GrantedAuthority> authorities(String roleName) {

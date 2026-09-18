@@ -13,6 +13,8 @@ public enum AuditEventType {
     // User Governance
     USER_DEACTIVATED,
     USER_PROVISIONED,
+    USER_ROLE_CHANGED,
+    TOKEN_REVOKED,
 
     // Borrowing & Asset Tracking
     BORROW_REQUEST_CREATED,

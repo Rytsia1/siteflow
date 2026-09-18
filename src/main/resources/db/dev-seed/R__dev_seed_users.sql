@@ -6,23 +6,26 @@
 -- in production deployments.
 -- =========================================================================
 
-INSERT INTO users (role_id, username, password_hash, full_name, job_position, is_active)
-SELECT r.id, 'admin', '$2b$10$TfwVMtix/ZbXNl/rYEnVYuhaA9LCKcysxnCRX2mOo0n8..TodUb/6', 'Dev Admin', 'Administrator', TRUE
+INSERT INTO users (role_id, username, password_hash, full_name, job_position, is_active, token_version)
+SELECT r.id, 'admin', '$2b$10$TfwVMtix/ZbXNl/rYEnVYuhaA9LCKcysxnCRX2mOo0n8..TodUb/6', 'Dev Admin', 'Administrator', TRUE, 1
 FROM roles r WHERE r.role_name = 'ADMIN'
 ON DUPLICATE KEY UPDATE
     password_hash = '$2b$10$TfwVMtix/ZbXNl/rYEnVYuhaA9LCKcysxnCRX2mOo0n8..TodUb/6',
-    is_active = TRUE;
+    is_active = TRUE,
+    token_version = 1;
 
-INSERT INTO users (role_id, username, password_hash, full_name, job_position, is_active)
-SELECT r.id, 'gudang', '$2b$10$kd.Psfos2DL1QPp5.HouVemJD2540oWm6qs5svzhUrL6lw5SuNmo6', 'Dev Warehouse Staff', 'Warehouse Staff', TRUE
+INSERT INTO users (role_id, username, password_hash, full_name, job_position, is_active, token_version)
+SELECT r.id, 'gudang', '$2b$10$kd.Psfos2DL1QPp5.HouVemJD2540oWm6qs5svzhUrL6lw5SuNmo6', 'Dev Warehouse Staff', 'Warehouse Staff', TRUE, 1
 FROM roles r WHERE r.role_name = 'WAREHOUSE_STAFF'
 ON DUPLICATE KEY UPDATE
     password_hash = '$2b$10$kd.Psfos2DL1QPp5.HouVemJD2540oWm6qs5svzhUrL6lw5SuNmo6',
-    is_active = TRUE;
+    is_active = TRUE,
+    token_version = 1;
 
-INSERT INTO users (role_id, username, password_hash, full_name, job_position, is_active)
-SELECT r.id, 'pekerja', '$2b$10$DooaDYXNN0SWNwxPT.0tSemXrfnx2S/lIrNgT1ORswc6f2L/p1L9C', 'Dev Field Staff', 'Field Worker', TRUE
+INSERT INTO users (role_id, username, password_hash, full_name, job_position, is_active, token_version)
+SELECT r.id, 'pekerja', '$2b$10$DooaDYXNN0SWNwxPT.0tSemXrfnx2S/lIrNgT1ORswc6f2L/p1L9C', 'Dev Field Staff', 'Field Worker', TRUE, 1
 FROM roles r WHERE r.role_name = 'FIELD_STAFF'
 ON DUPLICATE KEY UPDATE
     password_hash = '$2b$10$DooaDYXNN0SWNwxPT.0tSemXrfnx2S/lIrNgT1ORswc6f2L/p1L9C',
-    is_active = TRUE;
+    is_active = TRUE,
+    token_version = 1;

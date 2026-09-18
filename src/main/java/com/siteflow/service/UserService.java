@@ -86,4 +86,76 @@ public class UserService {
         }
         return user;
     }
+
+    /**
+     * Revokes all active JWT sessions for a user by incrementing their token_version.
+     *
+     * @param userId the ID of the user whose tokens to revoke
+     */
+    @Transactional
+    public void revokeUserTokens(Long userId) {
+        UserWithRole user = userMapper.findUserWithRoleById(userId);
+        if (user == null) {
+            throw new ResourceNotFoundException("User not found: " + userId);
+        }
+        userMapper.incrementTokenVersion(userId);
+
+        if (auditService != null) {
+            auditService.recordBusinessEvent(
+                    com.siteflow.domain.enums.AuditEventType.TOKEN_REVOKED,
+                    "USER",
+                    userId,
+                    "SUCCESS",
+                    "ACTIVE_TOKENS",
+                    "REVOKED",
+                    "All active JWT tokens revoked for user: " + user.getUsername());
+        }
+
+        log.info("All active JWT sessions revoked (token_version incremented) for user ID {}", userId);
+    }
+
+    /**
+     * Updates a user's role and immediately increments their token_version to invalidate
+     * any previously issued tokens under their old role.
+     *
+     * @param userId      the ID of the user to update
+     * @param newRoleName the new role name (e.g., 'ADMIN', 'FIELD_STAFF', 'WAREHOUSE_STAFF')
+     */
+    @Transactional
+    public void updateUserRole(Long userId, String newRoleName) {
+        UserWithRole user = userMapper.findUserWithRoleById(userId);
+        if (user == null) {
+            throw new ResourceNotFoundException("User not found: " + userId);
+        }
+
+        String normalizedRole = newRoleName.startsWith("ROLE_") ? newRoleName.substring(5) : newRoleName;
+        Long roleId = userMapper.findRoleIdByName(normalizedRole);
+        if (roleId == null) {
+            throw new IllegalArgumentException("Role not found: " + newRoleName);
+        }
+
+        // Prevent demoting the sole remaining active administrator
+        if (("ADMIN".equals(user.getRoleName()) || "ROLE_ADMIN".equals(user.getRoleName()))
+                && !"ADMIN".equals(normalizedRole)) {
+            int activeAdmins = userMapper.countActiveAdmins();
+            if (activeAdmins <= 1) {
+                throw new IllegalStateException("Cannot change the role of the sole remaining active administrator account.");
+            }
+        }
+
+        userMapper.updateRoleAndIncrementTokenVersion(userId, roleId);
+
+        if (auditService != null) {
+            auditService.recordBusinessEvent(
+                    com.siteflow.domain.enums.AuditEventType.USER_ROLE_CHANGED,
+                    "USER",
+                    userId,
+                    "SUCCESS",
+                    user.getRoleName(),
+                    normalizedRole,
+                    "Role changed from " + user.getRoleName() + " to " + normalizedRole + ". Previous tokens revoked.");
+        }
+
+        log.info("User ID {} role changed from {} to {}. Token version incremented.", userId, user.getRoleName(), normalizedRole);
+    }
 }

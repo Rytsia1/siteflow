@@ -68,6 +68,36 @@ class ResourceAuthorizationTest {
     @MockitoBean
     private PurchaseOrderMapper purchaseOrderMapper;
 
+    @MockitoBean
+    private com.siteflow.mapper.UserMapper userMapper;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUpUserMapper() {
+        when(userMapper.findUserWithRoleById(any())).thenAnswer(inv -> {
+            Long id = inv.getArgument(0);
+            String role = (id == 1L) ? "ADMIN" : ((id == 30L) ? "WAREHOUSE_STAFF" : ((id == 40L) ? "PROCUREMENT" : "FIELD_STAFF"));
+            String username = (id == 1L) ? "admin" : ((id == 10L) ? "userA" : ((id == 20L) ? "userB" : ((id == 30L) ? "gudang" : ((id == 40L) ? "buyer" : "user_" + id))));
+            return com.siteflow.domain.UserWithRole.builder()
+                    .id(id)
+                    .username(username)
+                    .roleName(role)
+                    .isActive(true)
+                    .tokenVersion(1)
+                    .build();
+        });
+        when(userMapper.findByUsername(any())).thenAnswer(inv -> {
+            String uname = inv.getArgument(0);
+            String role = "gudang".equals(uname) ? "WAREHOUSE_STAFF" : ("buyer".equals(uname) ? "PROCUREMENT" : "FIELD_STAFF");
+            return com.siteflow.domain.UserWithRole.builder()
+                    .id(1L)
+                    .username(uname)
+                    .roleName(role)
+                    .isActive(true)
+                    .tokenVersion(1)
+                    .build();
+        });
+    }
+
     private String bearerToken(Long userId, String username, String role) {
         UserPrincipal principal = new UserPrincipal(userId, username, "", role);
         return "Bearer " + jwtTokenProvider.generateToken(principal);
