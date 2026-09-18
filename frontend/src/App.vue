@@ -11,9 +11,70 @@ const route = useRoute()
 
 // Layout Sidebar State
 const isCollapsed = ref(false)
+const isMobileOpen = ref(false)
+const isMobile = ref(false)
+const isTablet = ref(false)
+
+function initSidebar() {
+  // Restore persisted state from localStorage
+  const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('siteflow.sidebar.collapsed') : null
+  // On first load, detect screen size
+  checkBreakpoint()
+  if (saved !== null) {
+    // Only apply saved state on desktop/tablet (not mobile drawer)
+    if (!isMobile.value) {
+      isCollapsed.value = saved === 'true'
+    }
+  } else if (isTablet.value) {
+    // Default to collapsed on tablet
+    isCollapsed.value = true
+  }
+}
+
+function checkBreakpoint() {
+  if (typeof window === 'undefined') return
+  isMobile.value = window.innerWidth < 640
+  isTablet.value = window.innerWidth >= 640 && window.innerWidth < 1024
+}
 
 function toggleSidebar() {
+  if (isMobile.value) {
+    isMobileOpen.value = !isMobileOpen.value
+    return
+  }
   isCollapsed.value = !isCollapsed.value
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('siteflow.sidebar.collapsed', String(isCollapsed.value))
+  }
+}
+
+function closeMobileDrawer() {
+  isMobileOpen.value = false
+}
+
+function handleMobileNavClick() {
+  if (isMobile.value) {
+    closeMobileDrawer()
+  }
+}
+
+function handleResize() {
+  const wasMobile = isMobile.value
+  checkBreakpoint()
+  // When transitioning to mobile, always close the collapsed state
+  if (isMobile.value && !wasMobile) {
+    isMobileOpen.value = false
+  }
+  // When transitioning away from mobile, restore desktop state
+  if (!isMobile.value && wasMobile) {
+    isMobileOpen.value = false
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('siteflow.sidebar.collapsed') : null
+    if (saved !== null) {
+      isCollapsed.value = saved === 'true'
+    } else if (isTablet.value) {
+      isCollapsed.value = true
+    }
+  }
 }
 
 // Theme State
@@ -261,9 +322,13 @@ const userInitials = computed(() => {
 
 onMounted(() => {
   initTheme()
+  initSidebar()
   loadReadState()
   if (isAuthenticated()) {
     fetchPendingCount()
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', handleResize)
   }
 })
 
@@ -273,6 +338,10 @@ watch(
     if (isAuthenticated()) {
       fetchPendingCount()
     }
+    // Close mobile drawer on navigation
+    if (isMobile.value) {
+      isMobileOpen.value = false
+    }
   }
 )
 </script>
@@ -280,35 +349,68 @@ watch(
 <template>
   <a href="#main-content" class="skip-link">Skip to main content</a>
 
-  <div v-if="isAuthenticated()" class="sf-app-shell">
+  <div v-if="isAuthenticated()" class="sf-app-shell" :class="{ 'sidebar-collapsed': isCollapsed && !isMobile, 'mobile-layout': isMobile }">
+
+    <!-- Mobile Overlay (backdrop when drawer is open) -->
+    <div
+      v-if="isMobile && isMobileOpen"
+      class="sf-mobile-overlay"
+      aria-hidden="true"
+      @click="closeMobileDrawer"
+    ></div>
+
     <!-- Left Navigation Sidebar -->
-    <aside class="sf-sidebar" :class="{ collapsed: isCollapsed }">
+    <aside
+      class="sf-sidebar"
+      :class="{
+        collapsed: isCollapsed && !isMobile,
+        'mobile-open': isMobile && isMobileOpen,
+        'mobile-mode': isMobile,
+      }"
+      :aria-hidden="isMobile && !isMobileOpen ? 'true' : undefined"
+    >
+      <!-- Brand Row -->
       <div class="sf-sidebar-brand">
         <div class="sf-logo-box">SF</div>
-        <div v-if="!isCollapsed" class="sf-brand-title">SITEFLOW</div>
+        <div class="sf-brand-title" :class="{ hidden: isCollapsed && !isMobile }">SITEFLOW</div>
+        <!-- Close button (mobile only) -->
+        <button
+          v-if="isMobile"
+          type="button"
+          class="sf-mobile-close-btn"
+          aria-label="Close navigation menu"
+          @click="closeMobileDrawer"
+        >
+          ✕
+        </button>
       </div>
 
       <nav class="sf-sidebar-nav" aria-label="Main Navigation">
         <!-- Operations Group -->
-        <div v-if="!isCollapsed" class="sf-nav-group-title">OPERATIONS</div>
+        <div class="sf-nav-group-title" :class="{ 'sr-only': isCollapsed && !isMobile }">OPERATIONS</div>
+
         <router-link
           to="/inventory"
           class="sf-nav-item"
           :class="{ active: $route.path === '/inventory' }"
-          title="Inventory Catalog"
+          :aria-label="isCollapsed && !isMobile ? 'Inventory Catalog' : undefined"
+          @click="handleMobileNavClick"
         >
           <span class="sf-nav-glyph">▤</span>
-          <span v-if="!isCollapsed" class="sf-nav-label">Inventory</span>
+          <span class="sf-nav-label" :class="{ 'sr-only': isCollapsed && !isMobile }">Inventory</span>
+          <span v-if="isCollapsed && !isMobile" class="sf-nav-tooltip">Inventory</span>
         </router-link>
 
         <router-link
           to="/borrow"
           class="sf-nav-item"
           :class="{ active: $route.path === '/borrow' }"
-          title="Borrowing"
+          :aria-label="isCollapsed && !isMobile ? 'Borrowing' : undefined"
+          @click="handleMobileNavClick"
         >
           <span class="sf-nav-glyph">⇄</span>
-          <span v-if="!isCollapsed" class="sf-nav-label">Borrowing</span>
+          <span class="sf-nav-label" :class="{ 'sr-only': isCollapsed && !isMobile }">Borrowing</span>
+          <span v-if="isCollapsed && !isMobile" class="sf-nav-tooltip">Borrowing</span>
         </router-link>
 
         <router-link
@@ -316,22 +418,28 @@ watch(
           to="/assets"
           class="sf-nav-item"
           :class="{ active: $route.path === '/assets' }"
-          title="Asset Scanner"
+          :aria-label="isCollapsed && !isMobile ? 'Asset Scanner' : undefined"
+          @click="handleMobileNavClick"
         >
           <span class="sf-nav-glyph">⬡</span>
-          <span v-if="!isCollapsed" class="sf-nav-label">Assets</span>
+          <span class="sf-nav-label" :class="{ 'sr-only': isCollapsed && !isMobile }">Assets</span>
+          <span v-if="isCollapsed && !isMobile" class="sf-nav-tooltip">Assets</span>
         </router-link>
 
-        <!-- Workflow Group -->
-        <div v-if="!isCollapsed" class="sf-nav-group-title">WORKFLOW</div>
+        <!-- Workflow Group divider -->
+        <div class="sf-nav-group-sep" :class="{ visible: isCollapsed && !isMobile }"></div>
+        <div class="sf-nav-group-title" :class="{ 'sr-only': isCollapsed && !isMobile }">WORKFLOW</div>
+
         <router-link
           to="/procurement"
           class="sf-nav-item"
           :class="{ active: $route.path === '/procurement' }"
-          title="Procurement & Material Requests"
+          :aria-label="isCollapsed && !isMobile ? 'Procurement & Material Requests' : undefined"
+          @click="handleMobileNavClick"
         >
           <span class="sf-nav-glyph">₱</span>
-          <span v-if="!isCollapsed" class="sf-nav-label">Procurement</span>
+          <span class="sf-nav-label" :class="{ 'sr-only': isCollapsed && !isMobile }">Procurement</span>
+          <span v-if="isCollapsed && !isMobile" class="sf-nav-tooltip">Procurement</span>
         </router-link>
 
         <router-link
@@ -339,39 +447,52 @@ watch(
           to="/approvals"
           class="sf-nav-item"
           :class="{ active: $route.path === '/approvals' }"
-          title="Approvals Queue"
+          :aria-label="isCollapsed && !isMobile ? `Approvals Queue${pendingApprovalsCount > 0 ? ` (${pendingApprovalsCount} pending)` : ''}` : undefined"
+          @click="handleMobileNavClick"
         >
           <span class="sf-nav-glyph">✓</span>
-          <span v-if="!isCollapsed" class="sf-nav-label">Approvals</span>
-          <span v-if="!isCollapsed && pendingApprovalsCount > 0" class="sf-nav-badge">
+          <span class="sf-nav-label" :class="{ 'sr-only': isCollapsed && !isMobile }">Approvals</span>
+          <span v-if="!isCollapsed || isMobile" class="sf-nav-badge" v-show="pendingApprovalsCount > 0">
             {{ pendingApprovalsCount }}
+          </span>
+          <span v-if="isCollapsed && !isMobile && pendingApprovalsCount > 0" class="sf-nav-dot-badge"></span>
+          <span v-if="isCollapsed && !isMobile" class="sf-nav-tooltip">
+            Approvals{{ pendingApprovalsCount > 0 ? ` · ${pendingApprovalsCount}` : '' }}
           </span>
         </router-link>
 
-        <!-- Utilities Group -->
-        <div v-if="!isCollapsed" class="sf-nav-group-title">UTILITIES</div>
+        <!-- Utilities Group divider -->
+        <div class="sf-nav-group-sep" :class="{ visible: isCollapsed && !isMobile }"></div>
+        <div class="sf-nav-group-title" :class="{ 'sr-only': isCollapsed && !isMobile }">UTILITIES</div>
+
         <router-link
           v-if="auth.role === 'ADMIN'"
           to="/analytics"
           class="sf-nav-item"
           :class="{ active: $route.path === '/analytics' }"
-          title="Analytics & Demand Forecast"
+          :aria-label="isCollapsed && !isMobile ? 'Analytics & Demand Forecast' : undefined"
+          @click="handleMobileNavClick"
         >
           <span class="sf-nav-glyph">◫</span>
-          <span v-if="!isCollapsed" class="sf-nav-label">Analytics</span>
+          <span class="sf-nav-label" :class="{ 'sr-only': isCollapsed && !isMobile }">Analytics</span>
+          <span v-if="isCollapsed && !isMobile" class="sf-nav-tooltip">Analytics</span>
         </router-link>
 
-        <!-- System Group -->
-        <div v-if="!isCollapsed" class="sf-nav-group-title">SYSTEM</div>
+        <!-- System Group divider -->
+        <div class="sf-nav-group-sep" :class="{ visible: isCollapsed && !isMobile }"></div>
+        <div class="sf-nav-group-title" :class="{ 'sr-only': isCollapsed && !isMobile }">SYSTEM</div>
+
         <router-link
           v-if="auth.role === 'ADMIN'"
           to="/audit"
           class="sf-nav-item"
           :class="{ active: $route.path === '/audit' }"
-          title="Audit Trail & Security Logging"
+          :aria-label="isCollapsed && !isMobile ? 'Audit Trail & Security Logging' : undefined"
+          @click="handleMobileNavClick"
         >
           <span class="sf-nav-glyph">≡</span>
-          <span v-if="!isCollapsed" class="sf-nav-label">Audit Trail</span>
+          <span class="sf-nav-label" :class="{ 'sr-only': isCollapsed && !isMobile }">Audit Trail</span>
+          <span v-if="isCollapsed && !isMobile" class="sf-nav-tooltip">Audit Trail</span>
         </router-link>
 
         <!-- Hidden El-Menu Items for Automated Test Compliance -->
@@ -388,15 +509,17 @@ watch(
         </div>
       </nav>
 
-      <!-- Collapse Sidebar Toggle Button -->
+      <!-- Collapse Toggle Button (desktop only) -->
       <button
+        v-if="!isMobile"
         type="button"
         class="sf-collapse-btn"
-        :aria-label="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        :aria-expanded="!isCollapsed"
+        :aria-label="isCollapsed ? 'Expand sidebar navigation' : 'Collapse sidebar navigation'"
         @click="toggleSidebar"
       >
-        <span v-if="!isCollapsed">« COLLAPSE</span>
-        <span v-else>»</span>
+        <span class="sf-collapse-icon" :class="{ rotated: isCollapsed }" aria-hidden="true">‹</span>
+        <span class="sf-collapse-label" :class="{ 'sr-only': isCollapsed }">Collapse</span>
       </button>
     </aside>
 
@@ -404,6 +527,21 @@ watch(
     <div class="sf-main-container">
       <!-- Sticky Top Header -->
       <header class="sf-header" role="banner">
+        <!-- Mobile Hamburger Button -->
+        <button
+          v-if="isMobile"
+          type="button"
+          class="sf-hamburger-btn"
+          :aria-expanded="isMobileOpen"
+          aria-label="Open navigation menu"
+          aria-controls="sf-sidebar-nav"
+          @click="toggleSidebar"
+        >
+          <span class="sf-hamburger-bar"></span>
+          <span class="sf-hamburger-bar"></span>
+          <span class="sf-hamburger-bar"></span>
+        </button>
+
         <div class="sf-header-crumbs">
           <router-link to="/inventory" class="crumb-root">SiteFlow</router-link>
           <span class="crumb-sep">/</span>
@@ -560,6 +698,15 @@ watch(
   color: var(--siteflow-text-primary);
 }
 
+/* Mobile overlay */
+.sf-mobile-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.55);
+  z-index: 39;
+  backdrop-filter: blur(1px);
+}
+
 /* Sidebar Styles */
 .sf-sidebar {
   flex: 0 0 auto;
@@ -571,27 +718,46 @@ watch(
   position: sticky;
   top: 0;
   height: 100vh;
-  transition: width 0.16s ease;
+  overflow: hidden;
+  transition: width 0.2s ease-in-out;
   z-index: 30;
 }
 
 .sf-sidebar.collapsed {
-  width: 62px;
+  width: 56px;
+}
+
+/* Mobile drawer mode */
+.sf-sidebar.mobile-mode {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 240px;
+  transform: translateX(-100%);
+  transition: transform 0.2s ease-in-out;
+  z-index: 40;
+}
+
+.sf-sidebar.mobile-mode.mobile-open {
+  transform: translateX(0);
 }
 
 .sf-sidebar-brand {
   height: 56px;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 10px;
   padding: 0 14px;
   border-bottom: 1px solid var(--siteflow-border-color, #1c2739);
+  overflow: hidden;
 }
 
 .sf-logo-box {
   width: 22px;
   height: 22px;
-  flex: 0 0 auto;
+  flex: 0 0 22px;
   border: 1px solid #4e88c4;
   background-color: #152741;
   display: grid;
@@ -610,19 +776,62 @@ watch(
   letter-spacing: 0.14em;
   color: #e6edf7;
   white-space: nowrap;
+  overflow: hidden;
+  flex: 1 1 auto;
+  transition: opacity 0.18s ease, max-width 0.2s ease-in-out;
+}
+
+.sf-brand-title.hidden {
+  opacity: 0;
+  max-width: 0;
+  pointer-events: none;
+}
+
+.sf-mobile-close-btn {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--siteflow-border-subtle, #243047);
+  color: #8695ac;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.sf-mobile-close-btn:hover {
+  color: #e6edf7;
+  border-color: #31405c;
 }
 
 .sf-sidebar-nav {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 10px 8px 16px;
+  overflow-x: hidden;
+  padding: 10px 0 16px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+}
+
+/* Group separator (visible only in collapsed mode) */
+.sf-nav-group-sep {
+  height: 0;
+  margin: 0;
+  border: none;
+  transition: height 0.2s ease, margin 0.2s ease;
+}
+
+.sf-nav-group-sep.visible {
+  height: 1px;
+  margin: 6px 10px;
+  background-color: var(--siteflow-border-color, #1c2739);
 }
 
 .sf-nav-group-title {
-  padding: 14px 8px 6px;
+  padding: 12px 8px 4px 16px;
   font-family: var(--siteflow-font-mono);
   font-size: 10px;
   font-weight: 600;
@@ -633,13 +842,15 @@ watch(
   text-transform: uppercase;
 }
 
+/* Nav item with tooltip support */
 .sf-nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  height: 32px;
-  padding: 0 8px;
+  height: 34px;
+  padding: 0 8px 0 14px;
   border: 0;
   border-left: 2px solid transparent;
   background-color: transparent;
@@ -651,6 +862,7 @@ watch(
   border-radius: 0 3px 3px 0;
   text-decoration: none;
   transition: background-color 0.12s ease, color 0.12s ease;
+  overflow: visible;
 }
 
 .sf-nav-item:hover {
@@ -665,13 +877,20 @@ watch(
   font-weight: 600;
 }
 
+.sf-nav-item:focus-visible {
+  outline: 2px solid #4e88c4;
+  outline-offset: -2px;
+  border-radius: 2px;
+}
+
 .sf-nav-glyph {
-  flex: 0 0 14px;
-  height: 14px;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
   display: grid;
   place-items: center;
   font-family: var(--siteflow-font-mono);
-  font-size: 12px;
+  font-size: 13px;
   color: #7396c0;
 }
 
@@ -683,6 +902,7 @@ watch(
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: opacity 0.15s ease;
 }
 
 .sf-nav-badge {
@@ -699,7 +919,59 @@ watch(
   border-radius: 2px;
 }
 
+/* Small dot badge for collapsed mode approvals indicator */
+.sf-nav-dot-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  background-color: #e0b152;
+  border-radius: 50%;
+  border: 1px solid #0d1424;
+}
+
+/* Tooltip for collapsed state */
+.sf-nav-tooltip {
+  display: none;
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: #1c2a40;
+  color: #dce9f6;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: 1px solid #2d3f5a;
+  pointer-events: none;
+  z-index: 200;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  /* arrow */
+}
+
+.sf-nav-tooltip::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: #2d3f5a;
+}
+
+.sf-sidebar.collapsed .sf-nav-item:hover .sf-nav-tooltip,
+.sf-sidebar.collapsed .sf-nav-item:focus-visible .sf-nav-tooltip {
+  display: block;
+}
+
+/* Collapse toggle button */
 .sf-collapse-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   height: 40px;
   border: 0;
   border-top: 1px solid var(--siteflow-border-color, #1c2739);
@@ -708,16 +980,76 @@ watch(
   font-family: var(--siteflow-font-mono);
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   cursor: pointer;
   text-align: left;
   padding: 0 14px;
   transition: color 0.12s ease, background-color 0.12s ease;
+  width: 100%;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .sf-collapse-btn:hover {
   color: #c6d3e6;
   background-color: #101a2b;
+}
+
+.sf-collapse-btn:focus-visible {
+  outline: 2px solid #4e88c4;
+  outline-offset: -2px;
+}
+
+.sf-collapse-icon {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: transform 0.2s ease-in-out;
+  display: inline-block;
+  color: #7396c0;
+}
+
+.sf-collapse-icon.rotated {
+  transform: rotate(180deg);
+}
+
+.sf-collapse-label {
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Hamburger button (mobile topbar) */
+.sf-hamburger-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  background: transparent;
+  border: 1px solid var(--siteflow-border-subtle, #243047);
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.sf-hamburger-btn:hover {
+  border-color: #31405c;
+}
+
+.sf-hamburger-btn:focus-visible {
+  outline: 2px solid #4e88c4;
+  outline-offset: 2px;
+}
+
+.sf-hamburger-bar {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background-color: #8695ac;
+  border-radius: 1px;
 }
 
 /* Main Container */
