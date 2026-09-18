@@ -7,11 +7,15 @@ import ApprovalDashboard from '../views/ApprovalDashboard.vue'
 import AssetScanner from '../views/AssetScanner.vue'
 import ProcurementView from '../views/ProcurementView.vue'
 import AnalyticsDashboard from '../views/AnalyticsDashboard.vue'
+import PrivacyPolicyView from '../views/PrivacyPolicyView.vue'
+import TermsOfServiceView from '../views/TermsOfServiceView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', name: 'login', component: LoginView },
+    { path: '/privacy', name: 'privacy', component: PrivacyPolicyView },
+    { path: '/terms', name: 'terms', component: TermsOfServiceView },
     { path: '/', redirect: '/inventory' },
     { path: '/inventory', name: 'inventory', component: InventoryList },
     { path: '/borrow', name: 'borrow', component: BorrowForm },
@@ -37,8 +41,10 @@ const router = createRouter({
   ],
 })
 
+const PUBLIC_ROUTES = ['login', 'privacy', 'terms']
+
 router.beforeEach((to) => {
-  if (to.name !== 'login' && !isAuthenticated()) {
+  if (!PUBLIC_ROUTES.includes(to.name) && !isAuthenticated()) {
     return { name: 'login' }
   }
   if (to.name === 'login' && isAuthenticated()) {

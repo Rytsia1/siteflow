@@ -1,5 +1,6 @@
 package com.siteflow.security;
 
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -22,6 +23,9 @@ public class DbUserDetailsService implements UserDetailsService {
         UserWithRole user = userMapper.findByUsername(username);
         if (user == null) {
             throw new UsernameNotFoundException("User not found: " + username);
+        }
+        if (Boolean.FALSE.equals(user.getIsActive())) {
+            throw new DisabledException("User account is deactivated.");
         }
         return new UserPrincipal(user.getId(), user.getUsername(), user.getPasswordHash(), user.getRoleName());
     }

@@ -18,6 +18,8 @@ public class User {
     private String passwordHash;
     private String fullName;
     private String jobPosition;
+    private Boolean isActive;
+    private LocalDateTime deactivatedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

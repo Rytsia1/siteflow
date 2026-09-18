@@ -38,6 +38,7 @@ class DbUserDetailsServiceTest {
                 .username("supervisor")
                 .passwordHash("$2a$10$encryptedHash")
                 .roleName("FIELD_STAFF")
+                .isActive(true)
                 .build();
 
         when(userMapper.findByUsername("supervisor")).thenReturn(user);
@@ -52,6 +53,24 @@ class DbUserDetailsServiceTest {
         assertThat(principal.getRoleName()).isEqualTo("FIELD_STAFF");
         assertThat(principal.getAuthorities().stream().map(GrantedAuthority::getAuthority))
                 .containsExactly("ROLE_FIELD_STAFF");
+    }
+
+    @Test
+    @DisplayName("loadUserByUsername throws DisabledException when user is deactivated")
+    void loadUserByUsername_deactivatedUser_throwsDisabledException() {
+        UserWithRole user = UserWithRole.builder()
+                .id(11L)
+                .username("former_worker")
+                .passwordHash("$2a$10$encryptedHash")
+                .roleName("FIELD_STAFF")
+                .isActive(false)
+                .build();
+
+        when(userMapper.findByUsername("former_worker")).thenReturn(user);
+
+        assertThatThrownBy(() -> userDetailsService.loadUserByUsername("former_worker"))
+                .isInstanceOf(org.springframework.security.authentication.DisabledException.class)
+                .hasMessageContaining("User account is deactivated.");
     }
 
     @Test

@@ -23,6 +23,7 @@ This is a personal software engineering project. It models a real-world operatio
 - [API Overview](#api-overview)
 - [Screenshots](#screenshots)
 - [Testing](#testing)
+- [Privacy & Data Governance](#privacy--data-governance)
 - [Roadmap](#roadmap-planned--not-implemented)
 - [License](#license)
 - [Development Notes](#development-notes)
@@ -359,6 +360,37 @@ mvn test
 Current coverage is a context-load smoke test (`SiteflowApplicationTests`) plus MockMvc tests for `ApprovalController`, `AssetTrackingController`, and `ProcurementController`. `InventoryController`, `BorrowController`, `LocationController`, `AuthController`, and `AnalyticsController` do not currently have dedicated test classes.
 
 **Frontend**: no automated test suite is configured — `frontend/package.json` only defines `dev`, `build`, and `preview` scripts. Frontend changes have been verified manually via `npm run build` and manual UI walkthroughs during development.
+
+## Privacy & Data Governance
+
+SiteFlow is engineered with strict **Privacy by Design** principles appropriate for an enterprise construction logistics system:
+
+### 1. Data Minimization & Stored Categories
+SiteFlow collects only operational business data necessary to maintain physical equipment custody and warehouse integrity:
+- **Identity & Roles**: `username`, `full_name`, `job_position`, and role assignment stored in MySQL `users`. No personal emails, phone numbers, home addresses, government IDs, or biometrics are collected.
+- **Authentication**: Salted BCrypt password hashes (cost 10) in `users.password_hash`. Password hashes and secrets are **never** exposed in any API response or DTO.
+- **Equipment & Logistics**: Borrow requests, return receipts, material requests, and purchase orders.
+- **Audit Ledger**: Append-only `transaction_logs` tracking physical item custody transfers.
+
+### 2. Cookie & Storage Architecture
+- **Cookies**: Zero cookies used (`document.cookie` is unused; no tracking or session cookies).
+- **Persistent Storage**: No tokens stored in persistent `localStorage`.
+- **Session Storage**: A short-lived JWT token is held in `sessionStorage` (`siteflow.auth`) for active tab requests and cleared on logout.
+- **Third-Party Trackers**: Zero external trackers, analytics beacons, or remote CDN scripts. All libraries are bundled locally.
+
+### 3. Account Deactivation & Data Anonymization
+Hard-deleting user records would cascade or fail against foreign key constraints (`ON DELETE RESTRICT`) on historical borrowing records and transaction logs, corrupting physical tool accountability and safety audit trails.
+Instead, SiteFlow implements an **Anonymize & Deactivate** model:
+- `POST /api/users/me/deactivate`: Users can request deactivation of their own account with explicit confirmation.
+- `POST /api/users/{id}/deactivate`: Administrators can deactivate accounts during employee offboarding.
+- The account is disabled (`is_active = FALSE`), credentials are permanently scrambled (`DEACTIVATED_[UUID]`), and identifying information is anonymized (`full_name = 'Anonymized User #[id]'`).
+- Subsequent login attempts are immediately blocked with HTTP `401 Unauthorized` (`User account is deactivated.`).
+- Historical equipment custody and transaction logs remain referentially valid.
+
+### 4. Privacy Policy & Terms of Service
+- Accessible publicly in the frontend via `/privacy` and `/terms` (linked from the login page and application footer).
+- Detailed documentation maintained in [`PRIVACY.md`](PRIVACY.md) and [`TERMS.md`](TERMS.md).
+- Placeholders requiring organizational confirmation (legal entity name, data governance contact) are clearly documented.
 
 ## Roadmap (planned — not implemented)
 

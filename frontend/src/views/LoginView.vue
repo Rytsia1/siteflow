@@ -57,6 +57,11 @@ async function handleSubmit() {
           </el-button>
         </el-form-item>
       </el-form>
+      <div class="login-footer">
+        <router-link to="/privacy" class="legal-link">Privacy Policy</router-link>
+        <span class="divider">&bull;</span>
+        <router-link to="/terms" class="legal-link">Terms of Service</router-link>
+      </div>
     </el-card>
   </div>
 </template>
@@ -72,5 +77,27 @@ async function handleSubmit() {
 
 .login-card {
   width: 360px;
+}
+
+.login-footer {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: #909399;
+}
+
+.legal-link {
+  color: #909399;
+  text-decoration: none;
+}
+
+.legal-link:hover {
+  color: #409eff;
+  text-decoration: underline;
+}
+
+.divider {
+  margin: 0 8px;
+  color: #dcdfe6;
 }
 </style>

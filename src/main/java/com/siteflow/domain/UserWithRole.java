@@ -14,4 +14,5 @@ public class UserWithRole {
     private String username;
     private String passwordHash;
     private String roleName;
+    private Boolean isActive;
 }

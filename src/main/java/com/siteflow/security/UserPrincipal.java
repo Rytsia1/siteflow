@@ -15,7 +15,11 @@ public class UserPrincipal extends User {
     private final String roleName;
 
     public UserPrincipal(Long userId, String username, String passwordHash, String roleName) {
-        super(username, passwordHash, authorities(roleName));
+        this(userId, username, passwordHash, roleName, true);
+    }
+
+    public UserPrincipal(Long userId, String username, String passwordHash, String roleName, boolean enabled) {
+        super(username, passwordHash, enabled, true, true, true, authorities(roleName));
         this.userId = userId;
         this.roleName = roleName;
     }

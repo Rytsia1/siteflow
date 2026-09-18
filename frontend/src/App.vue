@@ -32,6 +32,13 @@ function handleLogout() {
     <el-main>
       <router-view />
     </el-main>
+    <el-footer class="app-footer">
+      <span>SiteFlow &copy; 2026</span>
+      <span class="footer-divider">&bull;</span>
+      <router-link to="/privacy" class="footer-link">Privacy Policy</router-link>
+      <span class="footer-divider">&bull;</span>
+      <router-link to="/terms" class="footer-link">Terms of Service</router-link>
+    </el-footer>
   </el-container>
   <router-view v-else />
 </template>
@@ -39,6 +46,33 @@ function handleLogout() {
 <style scoped>
 .app-shell {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 13px;
+  color: #909399;
+  border-top: 1px solid #e4e7ed;
+  height: 48px;
+}
+
+.footer-link {
+  color: #909399;
+  text-decoration: none;
+}
+
+.footer-link:hover {
+  color: #409eff;
+  text-decoration: underline;
+}
+
+.footer-divider {
+  margin: 0 10px;
+  color: #dcdfe6;
 }
 
 .app-header {

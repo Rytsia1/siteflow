@@ -153,6 +153,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiResponse<ErrorDetails>> handleAuthenticationException(
             AuthenticationException ex, HttpServletRequest request) {
+        Throwable cause = ex.getCause();
+        if (ex instanceof org.springframework.security.authentication.DisabledException
+                || cause instanceof org.springframework.security.authentication.DisabledException) {
+            return buildError(HttpStatus.UNAUTHORIZED, "User account is deactivated.", request);
+        }
         return buildError(HttpStatus.UNAUTHORIZED, "Invalid username or password.", request);
     }
 
