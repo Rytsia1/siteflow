@@ -82,6 +82,22 @@ public class ProcurementService {
     public record MrLineItem(Long itemId, int requestedQty) {}
 
     // =========================================================================
+    // Purchase Order operations
+    // =========================================================================
+
+    /**
+     * Returns all purchase orders, ordered newest-first.
+     *
+     * <p>This is a read-only operation; it does not modify any state.
+     *
+     * @return an unmodifiable list of all purchase orders (may be empty, never null)
+     */
+    public List<PurchaseOrder> listAllPurchaseOrders() {
+        List<PurchaseOrder> results = purchaseOrderMapper.findAll();
+        return results != null ? results : List.of();
+    }
+
+    // =========================================================================
     // Material Request operations
     // =========================================================================
 

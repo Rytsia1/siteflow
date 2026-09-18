@@ -30,6 +30,10 @@ public interface PurchaseOrderMapper {
     @Select("SELECT * FROM purchase_orders WHERE mr_id = #{mrId}")
     List<PurchaseOrder> findByMrId(@Param("mrId") Long mrId);
 
+    /** Returns all purchase orders, newest first. */
+    @Select("SELECT * FROM purchase_orders ORDER BY id DESC")
+    List<PurchaseOrder> findAll();
+
     /** Transitions the PO between ISSUED → PARTIAL_RECEIVED → FULFILLED. */
     @Update("UPDATE purchase_orders SET po_status = #{status} WHERE id = #{id}")
     int updateStatus(@Param("id") Long id, @Param("status") PurchaseOrderStatus status);
@@ -40,3 +44,4 @@ public interface PurchaseOrderMapper {
                             @Param("expectedStatus") PurchaseOrderStatus expectedStatus,
                             @Param("newStatus") PurchaseOrderStatus newStatus);
 }
+
