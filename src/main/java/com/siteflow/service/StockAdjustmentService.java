@@ -93,6 +93,7 @@ public class StockAdjustmentService {
                         "No stock record for item " + itemId + " at location " + locationId);
             }
 
+            int beforeQty = stock.getCurrentQty();
             int qtyDelta = type == AdjustmentType.IN ? qty : -qty;
             if (itemStockMapper.adjustQty(stock.getId(), qtyDelta) == 0) {
                 throw new IllegalStateException(
@@ -119,6 +120,13 @@ public class StockAdjustmentService {
                     .qtyChange(qtyDelta)
                     .referenceId(adjustment.getId())
                     .timestamp(now)
+                    .action(com.siteflow.domain.enums.AuditEventType.STOCK_ADJUSTED.name())
+                    .resourceType("ITEM")
+                    .resourceId(itemId)
+                    .status("SUCCESS")
+                    .beforeState("qty: " + beforeQty)
+                    .afterState("qty: " + (beforeQty + qtyDelta))
+                    .details(reason != null && !reason.isBlank() ? reason : (type + " " + qty))
                     .build());
 
             if (idempotencyService != null) {

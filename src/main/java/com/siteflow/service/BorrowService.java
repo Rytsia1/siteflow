@@ -33,21 +33,29 @@ public class BorrowService {
     private final ItemStockMapper itemStockMapper;
     private final TransactionLogMapper transactionLogMapper;
     private final IdempotencyService idempotencyService;
+    private final AuditService auditService;
 
     @Autowired
     public BorrowService(BorrowRequestMapper borrowRequestMapper, BorrowItemMapper borrowItemMapper,
             ItemStockMapper itemStockMapper, TransactionLogMapper transactionLogMapper,
-            IdempotencyService idempotencyService) {
+            IdempotencyService idempotencyService, AuditService auditService) {
         this.borrowRequestMapper = borrowRequestMapper;
         this.borrowItemMapper = borrowItemMapper;
         this.itemStockMapper = itemStockMapper;
         this.transactionLogMapper = transactionLogMapper;
         this.idempotencyService = idempotencyService;
+        this.auditService = auditService;
+    }
+
+    public BorrowService(BorrowRequestMapper borrowRequestMapper, BorrowItemMapper borrowItemMapper,
+            ItemStockMapper itemStockMapper, TransactionLogMapper transactionLogMapper,
+            IdempotencyService idempotencyService) {
+        this(borrowRequestMapper, borrowItemMapper, itemStockMapper, transactionLogMapper, idempotencyService, null);
     }
 
     public BorrowService(BorrowRequestMapper borrowRequestMapper, BorrowItemMapper borrowItemMapper,
             ItemStockMapper itemStockMapper, TransactionLogMapper transactionLogMapper) {
-        this(borrowRequestMapper, borrowItemMapper, itemStockMapper, transactionLogMapper, null);
+        this(borrowRequestMapper, borrowItemMapper, itemStockMapper, transactionLogMapper, null, null);
     }
 
     public record BorrowItemRequest(Long itemId, int qty) {
@@ -117,6 +125,7 @@ public class BorrowService {
                 borrowItemMapper.insert(borrowItem);
 
                 ItemStock stock = findStock(request.itemId(), locationId);
+                int beforeQty = stock != null ? stock.getCurrentQty() : 0;
                 if (itemStockMapper.adjustQty(stock.getId(), -request.qty()) == 0) {
                     throw new IllegalStateException(
                             "Insufficient stock for item " + request.itemId() + " at location " + locationId);
@@ -130,7 +139,25 @@ public class BorrowService {
                         .qtyChange(-request.qty())
                         .referenceId(borrowRequest.getId())
                         .timestamp(LocalDateTime.now())
+                        .action(com.siteflow.domain.enums.AuditEventType.ITEM_BORROWED.name())
+                        .resourceType("ITEM")
+                        .resourceId(request.itemId())
+                        .status("SUCCESS")
+                        .beforeState("qty: " + beforeQty)
+                        .afterState("qty: " + (beforeQty - request.qty()))
+                        .details("Dispensed for borrow request #" + borrowRequest.getId())
                         .build());
+            }
+
+            if (auditService != null) {
+                auditService.recordBusinessEvent(
+                        com.siteflow.domain.enums.AuditEventType.BORROW_REQUEST_CREATED,
+                        "BORROW_REQUEST",
+                        borrowRequest.getId(),
+                        "SUCCESS",
+                        null,
+                        ApprovalStatus.PENDING_APPROVAL.name(),
+                        "Borrow request created for " + items.size() + " item(s)");
             }
 
             if (idempotencyService != null) {
@@ -181,6 +208,7 @@ public class BorrowService {
 
         ItemStock stock = itemStockMapper.findByItemIdAndLocationId(borrowItem.getItemId(),
                 borrowRequest.getLocationId());
+        int beforeQty = stock != null ? stock.getCurrentQty() : 0;
         itemStockMapper.adjustQty(stock.getId(), qtyReturned);
 
         transactionLogMapper.insert(TransactionLog.builder()
@@ -191,6 +219,13 @@ public class BorrowService {
                 .qtyChange(qtyReturned)
                 .referenceId(borrowRequest.getId())
                 .timestamp(now)
+                .action(com.siteflow.domain.enums.AuditEventType.ITEM_RETURNED.name())
+                .resourceType("ITEM")
+                .resourceId(borrowItem.getItemId())
+                .status("SUCCESS")
+                .beforeState("qty: " + beforeQty)
+                .afterState("qty: " + (beforeQty + qtyReturned))
+                .details("Returned " + qtyReturned + " unit(s) for borrow request #" + borrowRequest.getId())
                 .build());
 
         List<BorrowItem> allItems = borrowItemMapper.findByBorrowRequestId(borrowRequest.getId());
@@ -353,6 +388,17 @@ public class BorrowService {
 
         borrowRequestMapper.updateApproval(
                 borrowRequestId, ApprovalStatus.PENDING_APPROVAL, ApprovalStatus.REJECTED, userId, "Cancelled by requester");
+
+        if (auditService != null) {
+            auditService.recordBusinessEvent(
+                    com.siteflow.domain.enums.AuditEventType.BORROW_REQUEST_CANCELLED,
+                    "BORROW_REQUEST",
+                    borrowRequestId,
+                    "REJECTED",
+                    ApprovalStatus.PENDING_APPROVAL.name(),
+                    ApprovalStatus.REJECTED.name(),
+                    "Cancelled by requester");
+        }
         return borrowRequestMapper.findById(borrowRequestId);
     }
 }

@@ -199,12 +199,12 @@ class DatabaseBackupRestoreTest {
                     "idempotency_keys"
             );
 
-            // 2. Verify all 11 Flyway migrations are recorded as successful
+            // 2. Verify all 12 Flyway migrations are recorded as successful
             try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1")) {
                 assertThat(rs.next()).isTrue();
                 int migrationCount = rs.getInt(1);
                 log.info("Flyway migration count in restored DB: {}", migrationCount);
-                assertThat(migrationCount).isEqualTo(11);
+                assertThat(migrationCount).isEqualTo(12);
             }
 
             // 3. Verify representative records and foreign keys

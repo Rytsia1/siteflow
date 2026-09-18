@@ -18,9 +18,16 @@ import lombok.extern.slf4j.Slf4j;
 public class UserService {
 
     private final UserMapper userMapper;
+    private final AuditService auditService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public UserService(UserMapper userMapper, AuditService auditService) {
+        this.userMapper = userMapper;
+        this.auditService = auditService;
+    }
 
     public UserService(UserMapper userMapper) {
-        this.userMapper = userMapper;
+        this(userMapper, null);
     }
 
     /**
@@ -54,6 +61,17 @@ public class UserService {
         LocalDateTime now = LocalDateTime.now();
 
         userMapper.deactivateAndAnonymize(userId, anonymizedName, scrambledHash, now);
+
+        if (auditService != null) {
+            auditService.recordBusinessEvent(
+                    com.siteflow.domain.enums.AuditEventType.USER_DEACTIVATED,
+                    "USER",
+                    userId,
+                    "SUCCESS",
+                    "ACTIVE",
+                    "DEACTIVATED",
+                    "Account deactivated and personal data anonymized");
+        }
 
         log.info("User account ID {} successfully deactivated and personal data anonymized.", userId);
 

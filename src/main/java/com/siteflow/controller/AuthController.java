@@ -37,16 +37,28 @@ public class AuthController {
     private final JwtTokenProvider jwtTokenProvider;
     private final LoginAttemptService loginAttemptService;
     private final RateLimitProperties rateLimitProperties;
+    private final com.siteflow.service.AuditService auditService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AuthController(
+            AuthenticationManager authenticationManager,
+            JwtTokenProvider jwtTokenProvider,
+            LoginAttemptService loginAttemptService,
+            RateLimitProperties rateLimitProperties,
+            com.siteflow.service.AuditService auditService) {
+        this.authenticationManager = authenticationManager;
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.loginAttemptService = loginAttemptService;
+        this.rateLimitProperties = rateLimitProperties;
+        this.auditService = auditService;
+    }
 
     public AuthController(
             AuthenticationManager authenticationManager,
             JwtTokenProvider jwtTokenProvider,
             LoginAttemptService loginAttemptService,
             RateLimitProperties rateLimitProperties) {
-        this.authenticationManager = authenticationManager;
-        this.jwtTokenProvider = jwtTokenProvider;
-        this.loginAttemptService = loginAttemptService;
-        this.rateLimitProperties = rateLimitProperties;
+        this(authenticationManager, jwtTokenProvider, loginAttemptService, rateLimitProperties, null);
     }
 
     /**
@@ -72,6 +84,10 @@ public class AuthController {
             loginAttemptService.loginSucceeded(clientIp);
             log.info("Successful authentication for user: {} from IP: {}", principal.getUsername(), clientIp);
 
+            if (auditService != null) {
+                auditService.recordAuthSuccess(principal.getUserId(), principal.getUsername(), clientIp);
+            }
+
             String token = jwtTokenProvider.generateToken(principal);
             long expiresInSeconds = jwtTokenProvider.getExpirationMs() / 1000;
 
@@ -86,6 +102,9 @@ public class AuthController {
             return ApiResponse.success("Login successful.", tokenView);
         } catch (AuthenticationException ex) {
             loginAttemptService.loginFailed(clientIp);
+            if (auditService != null) {
+                auditService.recordAuthFailure(request.username(), clientIp, "Invalid credentials or inactive account");
+            }
             log.warn("Failed authentication attempt for username: {} from IP: {}", request.username(), clientIp);
             throw ex;
         }

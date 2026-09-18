@@ -162,6 +162,13 @@ public class AssetTrackingService {
                     .qtyChange(-1)
                     .referenceId(borrowRequestId)
                     .timestamp(LocalDateTime.now())
+                    .action(com.siteflow.domain.enums.AuditEventType.ITEM_BORROWED.name())
+                    .resourceType("ITEM_INSTANCE")
+                    .resourceId(instance.getId())
+                    .status("SUCCESS")
+                    .beforeState("AVAILABLE (SN: " + instance.getSerialNumber() + ")")
+                    .afterState("BORROWED")
+                    .details("Tool instance " + instance.getSerialNumber() + " checked out for borrow request #" + borrowRequestId)
                     .build());
         }
 
@@ -258,6 +265,13 @@ public class AssetTrackingService {
                     .qtyChange(1)
                     .referenceId(borrowRequestId)
                     .timestamp(LocalDateTime.now())
+                    .action(com.siteflow.domain.enums.AuditEventType.ITEM_RETURNED.name())
+                    .resourceType("ITEM_INSTANCE")
+                    .resourceId(instance.getId())
+                    .status("SUCCESS")
+                    .beforeState("BORROWED")
+                    .afterState("RETURNED (" + returnedCondition + ")")
+                    .details("Tool instance " + instance.getSerialNumber() + " returned with condition " + returnedCondition)
                     .build());
         }
 

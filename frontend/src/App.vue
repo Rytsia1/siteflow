@@ -121,6 +121,7 @@ onMounted(() => {
           </el-menu-item>
           <el-menu-item v-if="auth.role === 'ADMIN'" index="/approvals">Approvals</el-menu-item>
           <el-menu-item v-if="auth.role === 'ADMIN'" index="/analytics">Analytics</el-menu-item>
+          <el-menu-item v-if="auth.role === 'ADMIN'" index="/audit">Audit Trail</el-menu-item>
         </el-menu>
       </nav>
 

@@ -9,6 +9,7 @@ import ProcurementView from '../views/ProcurementView.vue'
 import AnalyticsDashboard from '../views/AnalyticsDashboard.vue'
 import PrivacyPolicyView from '../views/PrivacyPolicyView.vue'
 import TermsOfServiceView from '../views/TermsOfServiceView.vue'
+import AuditLogView from '../views/AuditLogView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -36,6 +37,12 @@ const router = createRouter({
       path: '/analytics',
       name: 'analytics',
       component: AnalyticsDashboard,
+      meta: { roles: ['ADMIN'] },
+    },
+    {
+      path: '/audit',
+      name: 'audit',
+      component: AuditLogView,
       meta: { roles: ['ADMIN'] },
     },
   ],

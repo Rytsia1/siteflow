@@ -146,6 +146,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<ErrorDetails>> handleAccessDenied(
             AccessDeniedException ex, HttpServletRequest request) {
+        String requestId = resolveRequestId(request);
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String caller = (auth != null && auth.isAuthenticated()) ? auth.getName() : "anonymous";
+        log.warn("[{}] Authorization failure: Access denied for caller '{}' on {} {}",
+                requestId, caller, request.getMethod(), request.getRequestURI());
         return buildError(HttpStatus.FORBIDDEN, "Access denied.", request);
     }
 

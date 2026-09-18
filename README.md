@@ -24,6 +24,9 @@ This is a personal software engineering project. It models a real-world operatio
 - [Screenshots](#screenshots)
 - [Testing](#testing)
 - [Privacy & Data Governance](#privacy--data-governance)
+- [Accessibility & UX Compliance](#accessibility--ux-compliance-wcag-21-aa)
+- [Audit Trail, Accountability & Security Logging](#audit-trail-accountability--security-logging)
+- [Software Supply Chain, Dependency, Asset & License Compliance](#software-supply-chain-dependency-asset--license-compliance)
 - [Roadmap](#roadmap-planned--not-implemented)
 - [License](#license)
 - [Development Notes](#development-notes)
@@ -422,6 +425,80 @@ SiteFlow is designed for high accessibility, visual consistency, and keyboard na
 7. **Automated Accessibility Testing**:
    - Automated regression test suite (`frontend/src/api/accessibility.test.js`) verifies WCAG AA contrast calculations, non-color status mappings, notification route resolution, empty states, and CSS focus ring rules.
 
+## Audit Trail, Accountability & Security Logging
+
+SiteFlow implements a dedicated, tamper-resistant, append-only **Audit Trail** architecture built by evolving the relational `transaction_logs` engine (Flyway `V12__audit_trail_and_accountability.sql`). It tracks critical business mutations and security-sensitive events without turning the application into an overly complex SIEM or logging pipeline.
+
+### 1. Audit Trail vs. Application Logs
+To avoid database explosion and maintain operational performance, SiteFlow strictly separates audit events from operational application logs:
+- **Audit Trail (Database `transaction_logs`)**: Records high-value business and security accountability events. Answers **WHO** did it, **WHAT** action occurred, **WHEN** it happened, **WHICH** entity was affected, **WHAT** changed (before $\to$ after), and **WHETHER** the operation succeeded or failed.
+  - *Never* logs generic HTTP requests, read queries (`GET`), mouse clicks, or field-level form validation errors.
+  - *Never* logs sensitive credentials, passwords, BCrypt hashes, JWTs, or `Authorization` headers.
+- **Application Logs (SLF4J / Logback console & files)**: Captures infrastructure events, database exceptions, internal stack traces, and system diagnostics with contextual correlation IDs (`X-Request-ID` / MDC `requestId`).
+
+### 2. Standardized Audit Event Vocabulary (`AuditEventType`)
+All audit records utilize a strongly typed, controlled vocabulary:
+- **Authentication & Account Lifecycle**:
+  - `LOGIN_SUCCESS`: Authenticated user login with client IP.
+  - `LOGIN_FAILURE`: Failed authentication attempt recording sanitized username only (zero passwords/tokens logged).
+  - `USER_DEACTIVATED`: Account deactivation and data anonymization.
+- **Borrowing & Tool Custody**:
+  - `BORROW_REQUEST_CREATED`: Initial equipment request and stock decrement.
+  - `BORROW_REQUEST_APPROVED` / `BORROW_REQUEST_REJECTED`: Administrative approval or rejection with notes.
+  - `BORROW_REQUEST_CANCELLED`: Cancellation of pending borrow requests.
+  - `ITEM_BORROWED` / `ITEM_RETURNED`: Physical checkout and return with tool condition.
+- **Inventory Management**:
+  - `STOCK_ADJUSTED`: Direct manual quantity correction, recording previous stock $\to$ new stock and operational reason.
+- **Procurement Pipeline**:
+  - `MATERIAL_REQUEST_CREATED`: Field material requisition submitted.
+  - `MATERIAL_REQUEST_APPROVED` / `MATERIAL_REQUEST_REJECTED`: Administrative decision on material request.
+  - `MATERIAL_REQUEST_CANCELLED`: Requisition cancelled.
+  - `PURCHASE_ORDER_CREATED`: Purchase order generated from approved requisition.
+
+### 3. Actor Identification & Anti-Spoofing
+- **Authenticated Identity**: The actor is resolved directly from the backend Spring Security context (`SecurityContextHolder.getContext().getAuthentication()`). The system **never** trusts client-supplied query parameters, path variables, or request body user IDs for audit identity.
+- **System Actions**: Automated or non-human background operations log the actor as `SYSTEM` rather than attributing them to an arbitrary user.
+- **Client IP Resolution**: Captures client IP via `X-Forwarded-For` or `HttpServletRequest.getRemoteAddr()`.
+
+### 4. State Transitions & Differential State
+To make audit investigations immediate and unambiguous, state changes capture structured before/after snapshots:
+- **Approval transitions**: `beforeState: "PENDING_APPROVAL"`, `afterState: "APPROVED"`
+- **Inventory adjustments**: `beforeState: "Stock: 20"`, `afterState: "Stock: 15 (Reason: Inventory recount)"`
+- **Rejection rationale**: Reason/notes are captured in the structured `details` metadata field.
+
+### 5. Transactional Consistency & Append-Only Integrity
+- **Transactional Atomicity**: Business mutations and corresponding audit entries execute within the same `@Transactional` boundary. If an inventory decrement fails or rolls back, no misleading "successful" audit log is persisted.
+- **Append-Only Ledger**: Audit records cannot be modified or deleted. No `UPDATE` or `DELETE` endpoints exist on the audit API. Foreign keys on `transaction_logs` are decoupled (`ON DELETE RESTRICT` dropped) to ensure audit history remains intact even if user records are deactivated or mock data is purged.
+
+### 6. Audit API (`/api/audit-logs`)
+Administrative users can inspect and filter audit history via a dedicated, read-only endpoint:
+- `GET /api/audit-logs`: Paginated search with dynamic filters:
+  - `action`: Specific `AuditEventType` (e.g., `STOCK_ADJUSTED`, `LOGIN_FAILURE`).
+  - `resourceType`: Resource classification (`ITEM`, `BORROW_REQUEST`, `MATERIAL_REQUEST`, `USER`, `AUTH`).
+  - `resourceId`: Exact ID of the audited entity.
+  - `actor`: Username search filter.
+  - `status`: `SUCCESS`, `FAILURE`, or `REJECTED`.
+  - `startDate` & `endDate`: ISO-8601 temporal range filter.
+  - `page` & `size`: Server-side pagination (default 20, strictly capped at 100).
+  - Headers returned: `X-Total-Count`, `X-Page-Number`, `X-Page-Size`.
+- `GET /api/audit-logs/{id}`: Detail view for individual event inspection.
+- **Authorization**: Strictly restricted to `ROLE_ADMIN` (`@PreAuthorize("hasRole('ADMIN')")`). Ordinary staff accounts receive HTTP `403 Forbidden`.
+
+### 7. Correlation & Request Tracking (`X-Request-ID`)
+- Every HTTP request receives a unique correlation ID via `CorrelationIdFilter`, exposed in response headers as `X-Request-ID`.
+- Mapped to SLF4J MDC (`requestId`), ensuring error logs, access denied warnings, and exception handlers (`GlobalExceptionHandler`) correlate back to the originating client request without leaking internal stack traces.
+
+### 8. Audit Retention Policy
+- **Storage Strategy**: Retained indefinitely in the relational `transaction_logs` table for operational traceability and safety accountability.
+- **Query Optimization**: High-performance composite database indexes support fast administrative queries:
+  - `idx_transaction_logs_action_timestamp (action, created_at)`
+  - `idx_transaction_logs_resource (resource_type, resource_id)`
+  - `idx_transaction_logs_actor_timestamp (user_id, created_at)`
+  - `idx_transaction_logs_timestamp (created_at)`
+
+> [!IMPORTANT]
+> **Developer Rule**: *Any new security-sensitive or business-critical state-changing operation must define whether it requires an audit event.*
+
 ## Software Supply Chain, Dependency, Asset & License Compliance
 
 SiteFlow maintains a minimal, audited, and strictly controlled software supply chain designed to mitigate third-party risk:
@@ -465,7 +542,7 @@ No license has been specified for this repository. All rights reserved by defaul
 
 ## Development Notes
 
-- **Flyway** manages the schema end-to-end: `V1__init_schema.sql` (core MVP schema), `V2__seed_reference_data.sql` (roles), `V3__seed_users.sql` (dev accounts), `V4__seed_sample_data.sql` (sample items/locations/stock), `V5__v2_management_schema.sql` (asset tracking, approval workflow columns, procurement pipeline), `V6__improve_schema_integrity_and_indexes.sql` (borrow request timestamps, analytics index), `V7__material_request_approval_audit.sql` (material request approval audit columns and REJECTED status). `baseline-on-migrate` is enabled and migrations run automatically on application startup — there is no manual migration step.
+- **Flyway** manages the schema end-to-end: `V1__init_schema.sql` (core MVP schema), `V2__seed_reference_data.sql` (roles), `V3__seed_users.sql` (dev accounts), `V4__seed_sample_data.sql` (sample items/locations/stock), `V5__v2_management_schema.sql` (asset tracking, approval workflow columns, procurement pipeline), `V6__improve_schema_integrity_and_indexes.sql` (borrow request timestamps, analytics index), `V7__material_request_approval_audit.sql` (material request approval audit columns and REJECTED status), `V8__item_instance_borrow_tracking.sql` (instance checkout tracking), `V9__duplicate_prevention_and_integrity.sql` (unique constraints and duplicate prevention), `V10__performance_optimization_indexes.sql` (composite query indexes), `V11__user_lifecycle_and_governance.sql` (user deactivation and anonymization columns), and `V12__audit_trail_and_accountability.sql` (audit event fields, decoupled foreign keys, and audit query indexes). `baseline-on-migrate` is enabled and migrations run automatically on application startup — there is no manual migration step.
 - **MyBatis** is used exclusively (no JPA/Hibernate). Simple CRUD mappers use `@Select`/`@Insert`/`@Update` with `map-underscore-to-camel-case: true`; multi-table read views use `@ConstructorArgs`/`@Arg` to project joined query results directly into Java records (e.g. `ItemSummaryView`, `BorrowRequestView`) without an ORM layer in between.
 - **Spring Security** is configured as fully stateless (`SessionCreationPolicy.STATELESS`) with HTTP Basic and CSRF disabled, since there is no server-side session or cookie-based flow — every request re-authenticates against the database via a custom `UserDetailsService`. Method-level authorization uses `@EnableMethodSecurity` with `@PreAuthorize` on every controller method.
 - **Transactional workflows**: multi-step writes (creating a borrow request across several items, submitting a material request with line items, generating a purchase order) are wrapped in a single `@Transactional` service method so a failure partway through rolls back the entire operation rather than leaving partial rows.

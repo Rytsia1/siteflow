@@ -50,22 +50,32 @@ public class ProcurementService {
     private final MaterialRequestItemMapper materialRequestItemMapper;
     private final PurchaseOrderMapper purchaseOrderMapper;
     private final IdempotencyService idempotencyService;
+    private final AuditService auditService;
 
     @Autowired
     public ProcurementService(MaterialRequestMapper materialRequestMapper,
                               MaterialRequestItemMapper materialRequestItemMapper,
                               PurchaseOrderMapper purchaseOrderMapper,
-                              IdempotencyService idempotencyService) {
+                              IdempotencyService idempotencyService,
+                              AuditService auditService) {
         this.materialRequestMapper = materialRequestMapper;
         this.materialRequestItemMapper = materialRequestItemMapper;
         this.purchaseOrderMapper = purchaseOrderMapper;
         this.idempotencyService = idempotencyService;
+        this.auditService = auditService;
+    }
+
+    public ProcurementService(MaterialRequestMapper materialRequestMapper,
+                              MaterialRequestItemMapper materialRequestItemMapper,
+                              PurchaseOrderMapper purchaseOrderMapper,
+                              IdempotencyService idempotencyService) {
+        this(materialRequestMapper, materialRequestItemMapper, purchaseOrderMapper, idempotencyService, null);
     }
 
     public ProcurementService(MaterialRequestMapper materialRequestMapper,
                               MaterialRequestItemMapper materialRequestItemMapper,
                               PurchaseOrderMapper purchaseOrderMapper) {
-        this(materialRequestMapper, materialRequestItemMapper, purchaseOrderMapper, null);
+        this(materialRequestMapper, materialRequestItemMapper, purchaseOrderMapper, null, null);
     }
 
     /** Represents a single line in a material request: which item and how many. */
@@ -137,6 +147,17 @@ public class ProcurementService {
             if (idempotencyService != null) {
                 idempotencyService.complete(key);
             }
+
+            if (auditService != null) {
+                auditService.recordBusinessEvent(
+                        com.siteflow.domain.enums.AuditEventType.MATERIAL_REQUEST_CREATED,
+                        "MATERIAL_REQUEST",
+                        mr.getId(),
+                        "SUCCESS",
+                        null,
+                        MaterialRequestStatus.SUBMITTED.name(),
+                        justification);
+            }
             return mr;
         } catch (Exception e) {
             if (idempotencyService != null) {
@@ -162,7 +183,18 @@ public class ProcurementService {
      */
     @Transactional
     public MaterialRequest approveMaterialRequest(Long mrId, Long adminId, String note) {
-        return transitionApproval(mrId, adminId, note, MaterialRequestStatus.APPROVED);
+        MaterialRequest mr = transitionApproval(mrId, adminId, note, MaterialRequestStatus.APPROVED);
+        if (auditService != null) {
+            auditService.recordBusinessEvent(
+                    com.siteflow.domain.enums.AuditEventType.MATERIAL_REQUEST_APPROVED,
+                    "MATERIAL_REQUEST",
+                    mrId,
+                    "SUCCESS",
+                    MaterialRequestStatus.SUBMITTED.name(),
+                    MaterialRequestStatus.APPROVED.name(),
+                    note != null ? note : "Approved by administrator");
+        }
+        return mr;
     }
 
     /**
@@ -180,7 +212,18 @@ public class ProcurementService {
      */
     @Transactional
     public MaterialRequest rejectMaterialRequest(Long mrId, Long adminId, String note) {
-        return transitionApproval(mrId, adminId, note, MaterialRequestStatus.REJECTED);
+        MaterialRequest mr = transitionApproval(mrId, adminId, note, MaterialRequestStatus.REJECTED);
+        if (auditService != null) {
+            auditService.recordBusinessEvent(
+                    com.siteflow.domain.enums.AuditEventType.MATERIAL_REQUEST_REJECTED,
+                    "MATERIAL_REQUEST",
+                    mrId,
+                    "REJECTED",
+                    MaterialRequestStatus.SUBMITTED.name(),
+                    MaterialRequestStatus.REJECTED.name(),
+                    note);
+        }
+        return mr;
     }
 
     /**
@@ -295,7 +338,18 @@ public class ProcurementService {
                     + " with status: " + mr.getStatus() + ". Must be SUBMITTED.");
         }
 
-        return transitionApproval(mrId, userId, "Cancelled by requester", MaterialRequestStatus.REJECTED);
+        mr = transitionApproval(mrId, userId, "Cancelled by requester", MaterialRequestStatus.REJECTED);
+        if (auditService != null) {
+            auditService.recordBusinessEvent(
+                    com.siteflow.domain.enums.AuditEventType.MATERIAL_REQUEST_CANCELLED,
+                    "MATERIAL_REQUEST",
+                    mrId,
+                    "REJECTED",
+                    MaterialRequestStatus.SUBMITTED.name(),
+                    MaterialRequestStatus.REJECTED.name(),
+                    "Cancelled by requester");
+        }
+        return mr;
     }
 
     // =========================================================================
@@ -350,6 +404,17 @@ public class ProcurementService {
                 .poStatus(PurchaseOrderStatus.ISSUED)   // initial state: order sent to supplier
                 .build();
         purchaseOrderMapper.insert(po);
+
+        if (auditService != null) {
+            auditService.recordBusinessEvent(
+                    com.siteflow.domain.enums.AuditEventType.PURCHASE_ORDER_CREATED,
+                    "PURCHASE_ORDER",
+                    po.getId(),
+                    "SUCCESS",
+                    "MR: " + MaterialRequestStatus.APPROVED.name(),
+                    "PO: " + PurchaseOrderStatus.ISSUED.name() + " (" + poNumber + ")",
+                    "Supplier: " + supplierName);
+        }
 
         return po;
     }

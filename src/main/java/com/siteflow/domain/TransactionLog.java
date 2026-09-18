@@ -22,4 +22,15 @@ public class TransactionLog {
     private Integer qtyChange;
     private Long referenceId;
     private LocalDateTime timestamp;
+
+    // Step 10: Audit Trail & Accountability attributes
+    private String action;
+    private String resourceType;
+    private Long resourceId;
+    private String actorUsername;
+    private String status;
+    private String beforeState;
+    private String afterState;
+    private String details;
+    private String ipAddress;
 }

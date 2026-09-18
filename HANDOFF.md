@@ -18,7 +18,10 @@ Welcome to the **SiteFlow** codebase. This handoff document provides a comprehen
 10. [Local Development & Deployment Guide](#10-local-development--deployment-guide)
 11. [Testing & Verification Suite](#11-testing--verification-suite)
 12. [Privacy & Data Governance](#12-privacy--data-governance)
-13. [Operational Gotchas & Future Roadmap](#13-operational-gotchas--future-roadmap)
+13. [Accessibility & UX Compliance (WCAG 2.1 AA)](#13-accessibility--ux-compliance-wcag-21-aa)
+14. [Software Supply Chain, Dependency & Asset Compliance](#14-software-supply-chain-dependency--asset-compliance)
+15. [Audit Trail, Accountability & Security Logging](#15-audit-trail-accountability--security-logging)
+16. [Operational Gotchas & Future Roadmap](#16-operational-gotchas--future-roadmap)
 
 ---
 
@@ -33,7 +36,7 @@ The system replaces manual paper logbooks and error-prone spreadsheets with:
 - **In-memory token bucket rate limiting** defending against brute-force and endpoint abuse.
 - **Privacy by Design & Data Governance** with account deactivation, data anonymization, zero cookie tracking, and IDOR protection.
 - **Repeatable disaster recovery scripts** with automated schema and data integrity verification.
-- **100% test-backed reliability** (309 backend tests, 14 frontend tests).
+- **100% test-backed reliability** (322 backend tests, 32 frontend tests).
 
 ---
 
@@ -48,7 +51,7 @@ The system replaces manual paper logbooks and error-prone spreadsheets with:
   - `spring-boot-starter-actuator` (Production health & observability probes)
 - **Persistence**: MyBatis 3.0.4 + MySQL Connector/J 8.0
 - **Connection Pool**: HikariCP (Max pool size: 20, connection timeout: 20s)
-- **Database Migrations**: Flyway Core (11 versioned migrations, V1 through V11)
+- **Database Migrations**: Flyway Core (12 versioned migrations, V1 through V12)
 - **Security & Tokens**: `jjwt-api` / `jjwt-impl` / `jjwt-jackson` (0.12.6, HMAC-SHA256)
 - **Build Tool**: Apache Maven 3.9+
 
@@ -343,7 +346,7 @@ npm run dev
 
 ---
 
-## 15. Software Supply Chain, Dependency & Asset Compliance
+## 14. Software Supply Chain, Dependency & Asset Compliance
 
 ### A. Dependency Locking & Version Determinism
 - **Backend (`pom.xml`)**: All direct dependencies are either pinned to explicit releases (`0.12.6`, `3.0.4`) or curated by Spring Boot BOM `spring-boot-starter-parent:3.5.0`. No dynamic or unbounded version ranges are permitted.
@@ -374,6 +377,51 @@ npm run dev
 
 ---
 
+## 15. Audit Trail, Accountability & Security Logging
+
+### A. Architectural Approach & Ledger Evolution
+SiteFlow extends its native `transaction_logs` relational table rather than introducing heavyweight external infrastructure (e.g. Kafka, Elasticsearch, or external SIEM clusters). 
+In Flyway migration `V12__audit_trail_and_accountability.sql`, the ledger is evolved with:
+- Decoupled foreign key constraints (`ON DELETE RESTRICT` dropped for `user_id`, `item_id`, `location_id`) to ensure audit records remain permanent even during user deactivation, data anonymization, or seed cleanups.
+- Expanded audit fields: `action` (VARCHAR 64), `resource_type` (VARCHAR 64), `resource_id` (BIGINT), `actor_username` (VARCHAR 100), `status` (VARCHAR 32), `before_state` (TEXT), `after_state` (TEXT), `details` (TEXT), and `ip_address` (VARCHAR 45).
+- Composite indexes supporting fast administrative time-series and resource searches.
+
+### B. Audit Event Model & Controlled Vocabulary
+All audit records are strongly typed via `com.siteflow.domain.enums.AuditEventType`:
+- **Authentication**: `LOGIN_SUCCESS`, `LOGIN_FAILURE`, `USER_DEACTIVATED`.
+- **Borrowing & Custody**: `BORROW_REQUEST_CREATED`, `BORROW_REQUEST_APPROVED`, `BORROW_REQUEST_REJECTED`, `BORROW_REQUEST_CANCELLED`, `ITEM_BORROWED`, `ITEM_RETURNED`.
+- **Inventory Control**: `STOCK_ADJUSTED`.
+- **Procurement Pipeline**: `MATERIAL_REQUEST_CREATED`, `MATERIAL_REQUEST_APPROVED`, `MATERIAL_REQUEST_REJECTED`, `MATERIAL_REQUEST_CANCELLED`, `PURCHASE_ORDER_CREATED`.
+
+### C. Anti-Spoofing & Actor Resolution
+- **Backend Context Extraction**: `AuditService` extracts identity exclusively from `SecurityContextHolder.getContext().getAuthentication()`. Client-supplied user IDs in query parameters or request bodies are ignored.
+- **System Actor**: Non-interactive or background automated processes record the actor as `SYSTEM`.
+- **Credential Protection**: Login failures record only sanitized username identifiers; raw credentials, passwords, hashes, and JWTs are never recorded.
+
+### D. Transactional Atomicity & Differential State
+- **Transactional Consistency**: Domain operations and their corresponding audit records execute within the identical `@Transactional` method. If an inventory decrement or request creation encounters an error and rolls back, the audit record rolls back with it, eliminating phantom "SUCCESS" records.
+- **State Transitions**: Mutations capture both `beforeState` and `afterState` (e.g., `PENDING_APPROVAL` $\to$ `APPROVED`, or `Stock: 20` $\to$ `Stock: 15`), while rejection reasons and approval notes are stored in `details`.
+
+### E. Security Logging & Tracing
+- **Correlation Propagation**: Every HTTP request receives an `X-Request-ID` via `CorrelationIdFilter`, bound to SLF4J MDC (`requestId`).
+- **Authorization Failures**: `GlobalExceptionHandler` logs `AccessDeniedException` with correlation ID, authenticated user, HTTP method, and requested URI.
+- **Safe Responses**: Detailed error envelopes returned to clients omit internal stack traces and server internals.
+
+### F. Read-Only Administrative Audit API
+- `GET /api/audit-logs`: Secured with `@PreAuthorize("hasRole('ADMIN')")`.
+- **Server-Side Pagination**: Enforces a strict default size of 20 and maximum cap of 100 with `X-Total-Count`, `X-Page-Number`, and `X-Page-Size` response headers.
+- **Dynamic Multi-Filter**: Filterable by `action`, `resourceType`, `resourceId`, `actor`, `status`, and date ranges (`startDate`, `endDate`).
+- **Append-Only Immutability**: No `POST`, `PUT`, `PATCH`, or `DELETE` endpoints exist on the audit controller.
+
+### G. Retention & Performance
+- Records are preserved indefinitely in relational storage to satisfy occupational safety and equipment custody accountability.
+- High-volume queries are backed by composite indexes: `(action, created_at)`, `(resource_type, resource_id)`, `(user_id, created_at)`, and `(created_at)`.
+
+> [!IMPORTANT]
+> **Developer Rule**: *Any new security-sensitive or business-critical state-changing operation must define whether it requires an audit event.*
+
+---
+
 ## 16. Operational Gotchas & Future Roadmap
 
 ### Operational Gotchas
@@ -383,6 +431,7 @@ npm run dev
 4. **Contrast Tokens on Upgrades**: Ensure custom Element Plus theme overrides do not reset text colors to default `#909399`.
 5. **Local Test Database Credentials**: Ensure `DB_PASSWORD` is set in the local environment if running `mvn test` against a password-protected MySQL database.
 6. **GPL Driver Review**: Do not distribute compiled closed-source binaries bundling MySQL Connector/J without legal review of the GPL-2.0 FOSS Exception.
+7. **Decoupled Audit Ledger**: Historical `transaction_logs` do not enforce foreign key cascading to allow permanent operational audit retention across user deactivation and data anonymization.
 
 ---
 *Document maintained by the SiteFlow Engineering Team.*

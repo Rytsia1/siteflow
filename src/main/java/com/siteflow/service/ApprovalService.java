@@ -27,9 +27,16 @@ import com.siteflow.web.dto.BorrowRequestView;
 public class ApprovalService {
 
     private final BorrowRequestMapper borrowRequestMapper;
+    private final AuditService auditService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ApprovalService(BorrowRequestMapper borrowRequestMapper, AuditService auditService) {
+        this.borrowRequestMapper = borrowRequestMapper;
+        this.auditService = auditService;
+    }
 
     public ApprovalService(BorrowRequestMapper borrowRequestMapper) {
-        this.borrowRequestMapper = borrowRequestMapper;
+        this(borrowRequestMapper, null);
     }
 
     /**
@@ -48,7 +55,18 @@ public class ApprovalService {
      */
     @Transactional
     public BorrowRequest approveBorrowRequest(Long requestId, Long adminId, String note) {
-        return transitionApproval(requestId, adminId, note, ApprovalStatus.APPROVED);
+        BorrowRequest request = transitionApproval(requestId, adminId, note, ApprovalStatus.APPROVED);
+        if (auditService != null) {
+            auditService.recordBusinessEvent(
+                    com.siteflow.domain.enums.AuditEventType.BORROW_REQUEST_APPROVED,
+                    "BORROW_REQUEST",
+                    requestId,
+                    "SUCCESS",
+                    ApprovalStatus.PENDING_APPROVAL.name(),
+                    ApprovalStatus.APPROVED.name(),
+                    note != null ? note : "Approved by administrator");
+        }
+        return request;
     }
 
     /**
@@ -69,7 +87,18 @@ public class ApprovalService {
      */
     @Transactional
     public BorrowRequest rejectBorrowRequest(Long requestId, Long adminId, String note) {
-        return transitionApproval(requestId, adminId, note, ApprovalStatus.REJECTED);
+        BorrowRequest request = transitionApproval(requestId, adminId, note, ApprovalStatus.REJECTED);
+        if (auditService != null) {
+            auditService.recordBusinessEvent(
+                    com.siteflow.domain.enums.AuditEventType.BORROW_REQUEST_REJECTED,
+                    "BORROW_REQUEST",
+                    requestId,
+                    "REJECTED",
+                    ApprovalStatus.PENDING_APPROVAL.name(),
+                    ApprovalStatus.REJECTED.name(),
+                    note);
+        }
+        return request;
     }
 
     /**
