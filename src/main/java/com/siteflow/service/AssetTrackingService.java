@@ -152,7 +152,15 @@ public class AssetTrackingService {
             borrowRequestMapper.updateStatus(borrowRequestId, BorrowStatus.BORROWED);
         }
 
-        // 7. Audit logging
+        // 7. Fulfill stock reservation for the checked out tool instance
+        if (itemStockMapper != null && borrowRequest.getLocationId() != null) {
+            ItemStock stock = itemStockMapper.findByItemIdAndLocationId(instance.getItemId(), borrowRequest.getLocationId());
+            if (stock != null) {
+                itemStockMapper.fulfillReservation(stock.getId(), 1);
+            }
+        }
+
+        // 8. Audit logging
         if (transactionLogMapper != null && borrowRequest.getLocationId() != null) {
             transactionLogMapper.insert(TransactionLog.builder()
                     .itemId(instance.getItemId())

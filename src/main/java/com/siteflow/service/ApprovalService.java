@@ -1,14 +1,23 @@
 package com.siteflow.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.siteflow.domain.BorrowItem;
 import com.siteflow.domain.BorrowRequest;
+import com.siteflow.domain.ItemStock;
+import com.siteflow.domain.TransactionLog;
 import com.siteflow.domain.enums.ApprovalStatus;
 import com.siteflow.domain.enums.BorrowStatus;
+import com.siteflow.domain.enums.TransactionType;
+import com.siteflow.mapper.BorrowItemMapper;
 import com.siteflow.mapper.BorrowRequestMapper;
+import com.siteflow.mapper.ItemStockMapper;
+import com.siteflow.mapper.TransactionLogMapper;
 import com.siteflow.web.ResourceNotFoundException;
 import com.siteflow.web.dto.BorrowRequestView;
 
@@ -28,15 +37,27 @@ public class ApprovalService {
 
     private final BorrowRequestMapper borrowRequestMapper;
     private final AuditService auditService;
+    private final BorrowItemMapper borrowItemMapper;
+    private final ItemStockMapper itemStockMapper;
+    private final TransactionLogMapper transactionLogMapper;
 
-    @org.springframework.beans.factory.annotation.Autowired
-    public ApprovalService(BorrowRequestMapper borrowRequestMapper, AuditService auditService) {
+    @Autowired
+    public ApprovalService(BorrowRequestMapper borrowRequestMapper, AuditService auditService,
+                           BorrowItemMapper borrowItemMapper, ItemStockMapper itemStockMapper,
+                           TransactionLogMapper transactionLogMapper) {
         this.borrowRequestMapper = borrowRequestMapper;
         this.auditService = auditService;
+        this.borrowItemMapper = borrowItemMapper;
+        this.itemStockMapper = itemStockMapper;
+        this.transactionLogMapper = transactionLogMapper;
+    }
+
+    public ApprovalService(BorrowRequestMapper borrowRequestMapper, AuditService auditService) {
+        this(borrowRequestMapper, auditService, null, null, null);
     }
 
     public ApprovalService(BorrowRequestMapper borrowRequestMapper) {
-        this(borrowRequestMapper, null);
+        this(borrowRequestMapper, null, null, null, null);
     }
 
     /**
@@ -45,8 +66,7 @@ public class ApprovalService {
      * <p>Transition: PENDING_APPROVAL → APPROVED
      *
      * <p>After approval the request is considered active and the warehouse staff
-     * may proceed with dispensing the items. The adminId and optional note are
-     * persisted for audit purposes.
+     * may proceed with dispensing the items. The reservation remains held.
      *
      * @param requestId the borrow request to approve
      * @param adminId   the user id of the approving admin
@@ -74,11 +94,8 @@ public class ApprovalService {
      *
      * <p>Transition: PENDING_APPROVAL → REJECTED
      *
-     * <p>Stock was already decremented when the request was created (borrowing happens
-     * up front; approval is a downstream sign-off), and rejection does not restore it —
-     * the physical items are still out and must come back through the normal return
-     * flow regardless of the approval outcome. The note should explain the reason so
-     * the requester can amend and resubmit if appropriate.
+     * <p>Releases all reserved stock back to available inventory and records an audit log.
+     * Physical items never left the warehouse; availability is completely restored.
      *
      * @param requestId the borrow request to reject
      * @param adminId   the user id of the rejecting admin
@@ -88,6 +105,37 @@ public class ApprovalService {
     @Transactional
     public BorrowRequest rejectBorrowRequest(Long requestId, Long adminId, String note) {
         BorrowRequest request = transitionApproval(requestId, adminId, note, ApprovalStatus.REJECTED);
+
+        // Release reserved stock for all items in the request
+        if (borrowItemMapper != null && itemStockMapper != null) {
+            List<BorrowItem> items = borrowItemMapper.findByBorrowRequestId(requestId);
+            if (items != null) {
+                LocalDateTime now = LocalDateTime.now();
+                for (BorrowItem item : items) {
+                    ItemStock stock = itemStockMapper.findByItemIdAndLocationId(item.getItemId(), request.getLocationId());
+                    if (stock != null) {
+                        itemStockMapper.releaseReservation(stock.getId(), item.getQtyBorrowed());
+                    }
+                    if (transactionLogMapper != null && request.getLocationId() != null) {
+                        transactionLogMapper.insert(TransactionLog.builder()
+                                .itemId(item.getItemId())
+                                .locationId(request.getLocationId())
+                                .userId(adminId)
+                                .transactionType(TransactionType.RETURN)
+                                .qtyChange(item.getQtyBorrowed())
+                                .referenceId(requestId)
+                                .timestamp(now)
+                                .action(com.siteflow.domain.enums.AuditEventType.BORROW_REQUEST_REJECTED.name())
+                                .resourceType("ITEM")
+                                .resourceId(item.getItemId())
+                                .status("SUCCESS")
+                                .details("Reservation released for rejected borrow request #" + requestId + ": " + (note != null ? note : ""))
+                                .build());
+                    }
+                }
+            }
+        }
+
         if (auditService != null) {
             auditService.recordBusinessEvent(
                     com.siteflow.domain.enums.AuditEventType.BORROW_REQUEST_REJECTED,

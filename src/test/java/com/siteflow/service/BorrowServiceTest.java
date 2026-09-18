@@ -56,17 +56,18 @@ class BorrowServiceTest {
     }
 
     @Test
-    @DisplayName("createBorrowRequest succeeds and decrements stock when availability is sufficient, recording audit log")
+    @DisplayName("createBorrowRequest succeeds and reserves stock when availability is sufficient, recording audit log")
     void createBorrowRequest_sufficientStock_succeeds() {
-        ItemStock stock = ItemStock.builder().id(50L).itemId(1L).locationId(10L).currentQty(5).build();
+        ItemStock stock = ItemStock.builder().id(50L).itemId(1L).locationId(10L).currentQty(5).reservedQty(0).build();
         when(itemStockMapper.findByItemIdAndLocationId(1L, 10L)).thenReturn(stock);
-        when(itemStockMapper.adjustQty(50L, -2)).thenReturn(1);
+        when(itemStockMapper.reserveStock(50L, 2)).thenReturn(1);
 
         BorrowRequest created = borrowService.createBorrowRequest(7L, 10L, List.of(new BorrowItemRequest(1L, 2)));
 
         assertThat(created.getStatus()).isEqualTo(BorrowStatus.PENDING);
         assertThat(created.getApprovalStatus()).isEqualTo(ApprovalStatus.PENDING_APPROVAL);
         verify(borrowItemMapper).insert(any());
+        verify(itemStockMapper).reserveStock(50L, 2);
 
         ArgumentCaptor<TransactionLog> logCaptor = ArgumentCaptor.forClass(TransactionLog.class);
         verify(transactionLogMapper).insert(logCaptor.capture());
@@ -85,14 +86,14 @@ class BorrowServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
 
         verify(borrowRequestMapper, never()).insert(any());
-        verify(itemStockMapper, never()).adjustQty(any(), anyInt());
+        verify(itemStockMapper, never()).reserveStock(any(), anyInt());
         verify(transactionLogMapper, never()).insert(any());
     }
 
     @Test
     @DisplayName("createBorrowRequest fails when requested quantity exceeds available stock, inserting nothing")
     void createBorrowRequest_insufficientStock_throwsWithoutSideEffects() {
-        ItemStock stock = ItemStock.builder().id(50L).itemId(1L).locationId(10L).currentQty(1).build();
+        ItemStock stock = ItemStock.builder().id(50L).itemId(1L).locationId(10L).currentQty(1).reservedQty(0).build();
         when(itemStockMapper.findByItemIdAndLocationId(1L, 10L)).thenReturn(stock);
 
         assertThatThrownBy(() -> borrowService.createBorrowRequest(7L, 10L, List.of(new BorrowItemRequest(1L, 2))))
@@ -107,10 +108,9 @@ class BorrowServiceTest {
     @Test
     @DisplayName("createBorrowRequest fails when cumulative item deduction exceeds available stock")
     void createBorrowRequest_cumulativeDepletion_throwsIllegalState() {
-        ItemStock stock = ItemStock.builder().id(50L).itemId(1L).locationId(10L).currentQty(5).build();
+        ItemStock stock = ItemStock.builder().id(50L).itemId(1L).locationId(10L).currentQty(5).reservedQty(0).build();
         when(itemStockMapper.findByItemIdAndLocationId(1L, 10L)).thenReturn(stock);
-        when(itemStockMapper.adjustQty(50L, -3)).thenReturn(1);
-        when(itemStockMapper.adjustQty(50L, -3)).thenReturn(0); // second deduction fails due to insufficient balance
+        when(itemStockMapper.reserveStock(50L, 3)).thenReturn(1, 0); // second deduction fails due to insufficient balance
 
         assertThatThrownBy(() -> borrowService.createBorrowRequest(7L, 10L,
                 List.of(new BorrowItemRequest(1L, 3), new BorrowItemRequest(1L, 3))))
@@ -315,5 +315,50 @@ class BorrowServiceTest {
                 .hasMessageContaining("does not belong to request 9");
 
         verify(borrowItemMapper, never()).recordReturn(any(), anyInt(), any());
+    }
+
+    @Test
+    @DisplayName("cancelBorrowRequest releases reservation and logs transaction")
+    void cancelBorrowRequest_pendingRequest_releasesReservation() {
+        BorrowRequest request = BorrowRequest.builder()
+                .id(9L).userId(7L).locationId(10L)
+                .status(BorrowStatus.PENDING).approvalStatus(ApprovalStatus.PENDING_APPROVAL)
+                .build();
+        BorrowItem item = BorrowItem.builder().id(101L).borrowRequestId(9L).itemId(1L).qtyBorrowed(2).build();
+        ItemStock stock = ItemStock.builder().id(50L).itemId(1L).locationId(10L).currentQty(3).reservedQty(2).build();
+
+        when(borrowRequestMapper.findById(9L)).thenReturn(request);
+        when(borrowItemMapper.findByBorrowRequestId(9L)).thenReturn(List.of(item));
+        when(itemStockMapper.findByItemIdAndLocationId(1L, 10L)).thenReturn(stock);
+        when(itemStockMapper.releaseReservation(50L, 2)).thenReturn(1);
+        when(borrowRequestMapper.updateApproval(9L, ApprovalStatus.PENDING_APPROVAL, ApprovalStatus.REJECTED, 7L, "Cancelled by requester")).thenReturn(1);
+
+        borrowService.cancelBorrowRequest(9L, 7L);
+
+        verify(itemStockMapper).releaseReservation(50L, 2);
+        verify(transactionLogMapper).insert(any());
+        verify(borrowRequestMapper).updateApproval(9L, ApprovalStatus.PENDING_APPROVAL, ApprovalStatus.REJECTED, 7L, "Cancelled by requester");
+    }
+
+    @Test
+    @DisplayName("checkoutBorrowRequest fulfills reservation and transitions to BORROWED")
+    void checkoutBorrowRequest_approvedPending_fulfillsReservation() {
+        BorrowRequest request = BorrowRequest.builder()
+                .id(9L).userId(7L).locationId(10L)
+                .status(BorrowStatus.PENDING).approvalStatus(ApprovalStatus.APPROVED)
+                .build();
+        BorrowItem item = BorrowItem.builder().id(101L).borrowRequestId(9L).itemId(1L).qtyBorrowed(2).build();
+        ItemStock stock = ItemStock.builder().id(50L).itemId(1L).locationId(10L).currentQty(3).reservedQty(2).build();
+
+        when(borrowRequestMapper.findById(9L)).thenReturn(request);
+        when(borrowRequestMapper.updateStatusGuarded(9L, BorrowStatus.PENDING, BorrowStatus.BORROWED)).thenReturn(1);
+        when(borrowItemMapper.findByBorrowRequestId(9L)).thenReturn(List.of(item));
+        when(itemStockMapper.findByItemIdAndLocationId(1L, 10L)).thenReturn(stock);
+        when(itemStockMapper.fulfillReservation(50L, 2)).thenReturn(1);
+
+        borrowService.checkoutBorrowRequest(9L, 1L);
+
+        verify(itemStockMapper).fulfillReservation(50L, 2);
+        verify(transactionLogMapper).insert(any());
     }
 }

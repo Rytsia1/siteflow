@@ -100,4 +100,13 @@ public class BorrowController {
         BorrowRequest cancelled = borrowService.cancelBorrowRequest(id, principal.getUserId());
         return ApiResponse.success("Borrow request cancelled.", cancelled);
     }
+
+    @PostMapping("/{id}/checkout")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    public ApiResponse<BorrowRequest> checkoutBorrowRequest(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        BorrowRequest checkedOut = borrowService.checkoutBorrowRequest(id, principal.getUserId());
+        return ApiResponse.success("Borrow request checked out.", checkedOut);
+    }
 }

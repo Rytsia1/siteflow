@@ -126,7 +126,7 @@ public class BorrowService {
 
                 ItemStock stock = findStock(request.itemId(), locationId);
                 int beforeQty = stock != null ? stock.getCurrentQty() : 0;
-                if (itemStockMapper.adjustQty(stock.getId(), -request.qty()) == 0) {
+                if (itemStockMapper.reserveStock(stock.getId(), request.qty()) == 0) {
                     throw new IllegalStateException(
                             "Insufficient stock for item " + request.itemId() + " at location " + locationId);
                 }
@@ -139,13 +139,13 @@ public class BorrowService {
                         .qtyChange(-request.qty())
                         .referenceId(borrowRequest.getId())
                         .timestamp(LocalDateTime.now())
-                        .action(com.siteflow.domain.enums.AuditEventType.ITEM_BORROWED.name())
+                        .action(com.siteflow.domain.enums.AuditEventType.BORROW_REQUEST_CREATED.name())
                         .resourceType("ITEM")
                         .resourceId(request.itemId())
                         .status("SUCCESS")
-                        .beforeState("qty: " + beforeQty)
-                        .afterState("qty: " + (beforeQty - request.qty()))
-                        .details("Dispensed for borrow request #" + borrowRequest.getId())
+                        .beforeState("avail: " + beforeQty)
+                        .afterState("avail: " + (beforeQty - request.qty()))
+                        .details("Reserved for borrow request #" + borrowRequest.getId())
                         .build());
             }
 
@@ -367,13 +367,13 @@ public class BorrowService {
                     + " and approval status: " + borrowRequest.getApprovalStatus());
         }
 
-        // Restore reserved stock for all items in the request
+        // Release reserved stock for all items in the request
         List<BorrowItem> items = borrowItemMapper.findByBorrowRequestId(borrowRequestId);
         LocalDateTime now = LocalDateTime.now();
         for (BorrowItem item : items) {
             ItemStock stock = itemStockMapper.findByItemIdAndLocationId(item.getItemId(), borrowRequest.getLocationId());
             if (stock != null) {
-                itemStockMapper.adjustQty(stock.getId(), item.getQtyBorrowed());
+                itemStockMapper.releaseReservation(stock.getId(), item.getQtyBorrowed());
             }
             transactionLogMapper.insert(TransactionLog.builder()
                     .itemId(item.getItemId())
@@ -383,6 +383,11 @@ public class BorrowService {
                     .qtyChange(item.getQtyBorrowed())
                     .referenceId(borrowRequestId)
                     .timestamp(now)
+                    .action(com.siteflow.domain.enums.AuditEventType.BORROW_REQUEST_CANCELLED.name())
+                    .resourceType("ITEM")
+                    .resourceId(item.getItemId())
+                    .status("SUCCESS")
+                    .details("Reservation released for cancelled borrow request #" + borrowRequestId)
                     .build());
         }
 
@@ -399,6 +404,74 @@ public class BorrowService {
                     ApprovalStatus.REJECTED.name(),
                     "Cancelled by requester");
         }
+        return borrowRequestMapper.findById(borrowRequestId);
+    }
+
+    /**
+     * Checks out / dispenses an approved borrow request.
+     * Transitions request status from PENDING to BORROWED and fulfills the stock reservations.
+     * Allowed for ADMIN and WAREHOUSE_STAFF.
+     */
+    @Transactional
+    public BorrowRequest checkoutBorrowRequest(Long borrowRequestId, Long staffUserId) {
+        BorrowRequest borrowRequest = borrowRequestMapper.findById(borrowRequestId);
+        if (borrowRequest == null) {
+            throw new ResourceNotFoundException("Borrow request not found: " + borrowRequestId);
+        }
+
+        if (borrowRequest.getApprovalStatus() != ApprovalStatus.APPROVED) {
+            throw new IllegalStateException("Borrow request " + borrowRequestId + " is not approved (approval status: "
+                    + borrowRequest.getApprovalStatus() + "). Cannot check out.");
+        }
+
+        if (borrowRequest.getStatus() != BorrowStatus.PENDING) {
+            throw new IllegalStateException("Borrow request " + borrowRequestId + " cannot be checked out with status: "
+                    + borrowRequest.getStatus() + ". Must be PENDING.");
+        }
+
+        int updated = borrowRequestMapper.updateStatusGuarded(borrowRequestId, BorrowStatus.PENDING, BorrowStatus.BORROWED);
+        if (updated == 0) {
+            throw new IllegalStateException("Borrow request " + borrowRequestId + " was concurrently updated.");
+        }
+
+        List<BorrowItem> items = borrowItemMapper.findByBorrowRequestId(borrowRequestId);
+        LocalDateTime now = LocalDateTime.now();
+        if (items != null) {
+            for (BorrowItem item : items) {
+                ItemStock stock = itemStockMapper.findByItemIdAndLocationId(item.getItemId(), borrowRequest.getLocationId());
+                if (stock != null) {
+                    itemStockMapper.fulfillReservation(stock.getId(), item.getQtyBorrowed());
+                }
+                if (transactionLogMapper != null && borrowRequest.getLocationId() != null) {
+                    transactionLogMapper.insert(TransactionLog.builder()
+                            .itemId(item.getItemId())
+                            .locationId(borrowRequest.getLocationId())
+                            .userId(staffUserId)
+                            .transactionType(TransactionType.BORROW)
+                            .qtyChange(-item.getQtyBorrowed())
+                            .referenceId(borrowRequestId)
+                            .timestamp(now)
+                            .action(com.siteflow.domain.enums.AuditEventType.ITEM_BORROWED.name())
+                            .resourceType("ITEM")
+                            .resourceId(item.getItemId())
+                            .status("SUCCESS")
+                            .details("Dispensed for approved borrow request #" + borrowRequestId)
+                            .build());
+                }
+            }
+        }
+
+        if (auditService != null) {
+            auditService.recordBusinessEvent(
+                    com.siteflow.domain.enums.AuditEventType.ITEM_BORROWED,
+                    "BORROW_REQUEST",
+                    borrowRequestId,
+                    "SUCCESS",
+                    BorrowStatus.PENDING.name(),
+                    BorrowStatus.BORROWED.name(),
+                    "Borrow request checked out / dispensed");
+        }
+
         return borrowRequestMapper.findById(borrowRequestId);
     }
 }

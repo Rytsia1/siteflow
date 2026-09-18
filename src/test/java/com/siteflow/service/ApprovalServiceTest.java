@@ -22,6 +22,12 @@ import com.siteflow.domain.BorrowRequest;
 import com.siteflow.domain.enums.ApprovalStatus;
 import com.siteflow.domain.enums.BorrowStatus;
 import com.siteflow.mapper.BorrowRequestMapper;
+import com.siteflow.domain.BorrowItem;
+import com.siteflow.domain.ItemStock;
+import com.siteflow.domain.TransactionLog;
+import com.siteflow.mapper.BorrowItemMapper;
+import com.siteflow.mapper.ItemStockMapper;
+import com.siteflow.mapper.TransactionLogMapper;
 import com.siteflow.web.ResourceNotFoundException;
 import com.siteflow.web.dto.BorrowRequestView;
 
@@ -30,12 +36,18 @@ class ApprovalServiceTest {
 
     @Mock
     private BorrowRequestMapper borrowRequestMapper;
+    @Mock
+    private BorrowItemMapper borrowItemMapper;
+    @Mock
+    private ItemStockMapper itemStockMapper;
+    @Mock
+    private TransactionLogMapper transactionLogMapper;
 
     private ApprovalService approvalService;
 
     @BeforeEach
     void setUp() {
-        approvalService = new ApprovalService(borrowRequestMapper);
+        approvalService = new ApprovalService(borrowRequestMapper, null, borrowItemMapper, itemStockMapper, transactionLogMapper);
     }
 
     @Test
@@ -56,21 +68,29 @@ class ApprovalServiceTest {
     }
 
     @Test
-    @DisplayName("rejectBorrowRequest succeeds when the request is pending approval")
+    @DisplayName("rejectBorrowRequest succeeds when the request is pending approval and releases reserved stock")
     void reject_pendingRequest_succeeds() {
-        BorrowRequest pending = BorrowRequest.builder().id(1L).approvalStatus(ApprovalStatus.PENDING_APPROVAL)
+        BorrowRequest pending = BorrowRequest.builder().id(1L).locationId(10L).approvalStatus(ApprovalStatus.PENDING_APPROVAL)
                 .status(BorrowStatus.PENDING).build();
-        BorrowRequest rejected = BorrowRequest.builder().id(1L).approvalStatus(ApprovalStatus.REJECTED)
+        BorrowRequest rejected = BorrowRequest.builder().id(1L).locationId(10L).approvalStatus(ApprovalStatus.REJECTED)
                 .approvalNote("Insufficient justification").status(BorrowStatus.PENDING).build();
+        BorrowItem item = BorrowItem.builder().id(101L).borrowRequestId(1L).itemId(5L).qtyBorrowed(2).build();
+        ItemStock stock = ItemStock.builder().id(50L).itemId(5L).locationId(10L).currentQty(3).reservedQty(2).build();
+
         when(borrowRequestMapper.findById(1L)).thenReturn(pending, rejected);
         when(borrowRequestMapper.updateApproval(1L, ApprovalStatus.PENDING_APPROVAL, ApprovalStatus.REJECTED, 9L,
                 "Insufficient justification")).thenReturn(1);
+        when(borrowItemMapper.findByBorrowRequestId(1L)).thenReturn(List.of(item));
+        when(itemStockMapper.findByItemIdAndLocationId(5L, 10L)).thenReturn(stock);
+        when(itemStockMapper.releaseReservation(50L, 2)).thenReturn(1);
 
         BorrowRequest result = approvalService.rejectBorrowRequest(1L, 9L, "Insufficient justification");
 
         assertThat(result.getApprovalStatus()).isEqualTo(ApprovalStatus.REJECTED);
         verify(borrowRequestMapper).updateApproval(1L, ApprovalStatus.PENDING_APPROVAL, ApprovalStatus.REJECTED, 9L,
                 "Insufficient justification");
+        verify(itemStockMapper).releaseReservation(50L, 2);
+        verify(transactionLogMapper).insert(any());
     }
 
     @Test
