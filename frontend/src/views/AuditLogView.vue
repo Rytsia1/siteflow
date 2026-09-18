@@ -165,6 +165,7 @@ onMounted(() => {
 
 <template>
   <main id="main-content" class="audit-view" role="main" aria-label="System Audit Trail and Accountability Ledger">
+    <div class="tech-kicker">GET /api/audit-logs · AUDIT TRAIL &amp; ACCOUNTABILITY</div>
     <div class="header-section">
       <div>
         <h1 class="page-title">Audit Trail & Accountability Ledger</h1>

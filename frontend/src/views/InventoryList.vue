@@ -55,6 +55,11 @@ const filteredItems = computed(() => {
   })
 })
 
+// Computed KPI tiles for the design
+const lowStockCount = computed(() => items.value.filter((i) => i.totalQty <= i.minStockThreshold).length)
+const toolCount = computed(() => items.value.filter((i) => i.category === 'TOOL' || i.category === 'LIFTING_GEAR').length)
+const healthyCount = computed(() => items.value.filter((i) => i.totalQty > i.minStockThreshold).length)
+
 async function loadItems() {
   loading.value = true
   try {
@@ -99,11 +104,11 @@ async function submitAdjustment() {
       qty: adjustForm.qty,
       reason: adjustForm.reason?.trim() || null,
     })
-    ElMessage.success('Stock adjustment recorded.')
+    ElMessage.success('Stock adjusted successfully.')
     adjustDialogVisible.value = false
     await loadItems()
   } catch {
-    // interceptor already showed the error toast
+    // interceptor handled error
   } finally {
     adjusting.value = false
   }
@@ -119,12 +124,75 @@ onMounted(() => {
 
 <template>
   <div class="inventory-page">
-    <h1 class="page-title">Inventory Catalog &amp; Stock Levels</h1>
+    <div class="tech-kicker">GET /api/items · CATALOG &amp; STOCKS</div>
+    <div class="page-header-row">
+      <div>
+        <h1 class="page-title">Inventory</h1>
+        <p class="page-subtitle">Materials, tools and lifting gear across all site stores.</p>
+      </div>
+      <div class="header-actions">
+        <button
+          v-if="canAdjustStock"
+          type="button"
+          class="sf-btn-primary"
+          aria-label="Open manual stock adjustment dialog"
+          @click="openAdjustmentDialog()"
+        >
+          Adjust Stock
+        </button>
+      </div>
+    </div>
 
-    <div class="toolbar" role="search" aria-label="Inventory search and filter tools">
+    <!-- Stat Tiles (Industrial Design) -->
+    <div class="sf-stat-grid" role="region" aria-label="Inventory Metrics Summary">
+      <div class="sf-stat-tile">
+        <span class="sf-corner-mark top-left">+</span>
+        <span class="sf-corner-mark top-right">+</span>
+        <span class="sf-corner-mark bottom-left">+</span>
+        <span class="sf-corner-mark bottom-right">+</span>
+        <div class="sf-stat-label">TOTAL ITEMS</div>
+        <div class="sf-stat-value" style="color: #F0F5FB">{{ items.length }}</div>
+        <div class="sf-stat-note">Registered catalog</div>
+      </div>
+
+      <div class="sf-stat-tile">
+        <span class="sf-corner-mark top-left">+</span>
+        <span class="sf-corner-mark top-right">+</span>
+        <span class="sf-corner-mark bottom-left">+</span>
+        <span class="sf-corner-mark bottom-right">+</span>
+        <div class="sf-stat-label">LOW / OUT OF STOCK</div>
+        <div class="sf-stat-value" :style="{ color: lowStockCount > 0 ? '#E8756A' : '#5FC08A' }">
+          {{ lowStockCount }}
+        </div>
+        <div class="sf-stat-note">Items below threshold</div>
+      </div>
+
+      <div class="sf-stat-tile">
+        <span class="sf-corner-mark top-left">+</span>
+        <span class="sf-corner-mark top-right">+</span>
+        <span class="sf-corner-mark bottom-left">+</span>
+        <span class="sf-corner-mark bottom-right">+</span>
+        <div class="sf-stat-label">TOOLS &amp; GEAR</div>
+        <div class="sf-stat-value" style="color: #8FB6DD">{{ toolCount }}</div>
+        <div class="sf-stat-note">Tracked equipment</div>
+      </div>
+
+      <div class="sf-stat-tile">
+        <span class="sf-corner-mark top-left">+</span>
+        <span class="sf-corner-mark top-right">+</span>
+        <span class="sf-corner-mark bottom-left">+</span>
+        <span class="sf-corner-mark bottom-right">+</span>
+        <div class="sf-stat-label">IN STOCK (NORMAL)</div>
+        <div class="sf-stat-value" style="color: #5FC08A">{{ healthyCount }}</div>
+        <div class="sf-stat-note">Healthy inventory level</div>
+      </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="inventory-toolbar" role="search" aria-label="Inventory search and filter tools">
       <el-input
         v-model="searchText"
-        placeholder="Search by item code or name"
+        placeholder="Search by item code or name..."
         aria-label="Search inventory by item code or name"
         clearable
         style="width: 280px"
@@ -134,29 +202,57 @@ onMounted(() => {
         placeholder="All categories"
         aria-label="Filter items by category"
         clearable
-        style="width: 200px"
+        style="width: 180px"
       >
         <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
       </el-select>
-      <el-button :loading="loading" :disabled="loading" aria-label="Refresh inventory items" @click="loadItems">
+      <button
+        type="button"
+        class="sf-btn-secondary"
+        :disabled="loading"
+        aria-label="Refresh inventory items"
+        @click="loadItems"
+      >
         Refresh
-      </el-button>
-      <el-button v-if="canAdjustStock" type="primary" aria-label="Open manual stock adjustment dialog" @click="openAdjustmentDialog()">
-        Adjust Stock
-      </el-button>
+      </button>
+
+      <div class="toolbar-spacer"></div>
+
+      <span class="item-count-label">
+        {{ filteredItems.length }} OF {{ items.length }} ITEMS
+      </span>
     </div>
 
+    <!-- Accessible Data Table -->
     <div class="accessible-table-container" tabindex="0" aria-label="Inventory items table">
       <el-table v-loading="loading" :data="filteredItems" stripe border>
-        <el-table-column prop="itemCode" label="Item Code" width="140" />
-        <el-table-column prop="name" label="Name" min-width="200" />
-        <el-table-column label="Category" width="150">
+        <el-table-column prop="itemCode" label="Item Code" width="150">
           <template #default="{ row }">
-            <el-tag :type="categoryTagType[row.category] || 'info'">{{ categoryLabel(row.category) }}</el-tag>
+            <span class="code-id">{{ row.itemCode }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="unit" label="Unit" width="100" />
-        <el-table-column label="Current Stock" width="180">
+
+        <el-table-column prop="name" label="Item Name" min-width="220">
+          <template #default="{ row }">
+            <span class="item-name-cell">{{ row.name }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="Category" width="160">
+          <template #default="{ row }">
+            <span class="category-pill" :class="row.category.toLowerCase()">
+              {{ categoryLabel(row.category) }}
+            </span>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="unit" label="Unit" width="100">
+          <template #default="{ row }">
+            <span class="mono-unit">{{ row.unit }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="Current Stock" width="200">
           <template #default="{ row }">
             <span
               :class="['status-badge', row.totalQty <= row.minStockThreshold ? 'danger' : 'success']"
@@ -167,17 +263,21 @@ onMounted(() => {
             </span>
           </template>
         </el-table-column>
+
         <el-table-column v-if="canAdjustStock" label="Actions" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button
-              size="small"
+            <button
+              type="button"
+              class="sf-btn-secondary"
+              style="height: 28px; padding: 0 10px; font-size: 12px"
               :aria-label="`Adjust stock for ${row.name} (${row.itemCode})`"
               @click="openAdjustmentDialog(row)"
             >
               Adjust
-            </el-button>
+            </button>
           </template>
         </el-table-column>
+
         <template #empty>
           <el-empty
             v-if="searchText || categoryFilter"
@@ -188,12 +288,15 @@ onMounted(() => {
       </el-table>
     </div>
 
+    <!-- Stock Adjustment Modal Dialog -->
     <el-dialog
       v-model="adjustDialogVisible"
       title="Adjust Stock"
       width="480px"
       aria-modal="true"
+      custom-class="sf-dialog"
     >
+      <div class="tech-kicker">POST /api/stock-adjustments</div>
       <el-form ref="adjustFormRef" :model="adjustForm" :rules="adjustRules" label-position="top">
         <el-form-item label="Item" prop="itemId">
           <el-select v-model="adjustForm.itemId" placeholder="Select item" filterable style="width: 100%">
@@ -234,19 +337,88 @@ onMounted(() => {
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="adjustDialogVisible = false">Cancel</el-button>
-        <el-button type="primary" :loading="adjusting" :disabled="adjusting" @click="submitAdjustment">
+        <button type="button" class="sf-btn-secondary" @click="adjustDialogVisible = false">
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="sf-btn-primary"
+          :disabled="adjusting"
+          @click="submitAdjustment"
+        >
           Submit Adjustment
-        </el-button>
+        </button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <style scoped>
-.toolbar {
+.page-header-row {
   display: flex;
-  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.inventory-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-bottom: 16px;
+}
+
+.toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+.item-count-label {
+  font-family: var(--siteflow-font-mono);
+  font-size: 11.5px;
+  color: var(--siteflow-text-placeholder);
+  letter-spacing: 0.06em;
+}
+
+.item-name-cell {
+  font-weight: 500;
+  color: var(--siteflow-text-primary);
+}
+
+.category-pill {
+  font-family: var(--siteflow-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 3px 6px;
+  border-radius: 2px;
+  border: 1px solid var(--siteflow-border-subtle);
+  background-color: var(--siteflow-bg-surface);
+  color: #9dafc6;
+}
+
+.category-pill.tool {
+  color: #8fb6dd;
+  border-color: rgba(143, 182, 221, 0.3);
+  background-color: rgba(143, 182, 221, 0.08);
+}
+
+.category-pill.consumable {
+  color: #5fc08a;
+  border-color: rgba(95, 192, 138, 0.3);
+  background-color: rgba(95, 192, 138, 0.08);
+}
+
+.category-pill.lifting_gear {
+  color: #e0b152;
+  border-color: rgba(224, 177, 82, 0.3);
+  background-color: rgba(224, 177, 82, 0.08);
+}
+
+.mono-unit {
+  font-family: var(--siteflow-font-mono);
+  font-size: 12px;
+  color: var(--siteflow-text-muted);
 }
 </style>

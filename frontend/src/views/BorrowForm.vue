@@ -71,7 +71,7 @@ async function handleSubmit() {
     form.lines = [{ itemId: null, qty: 1 }]
     formRef.value.clearValidate()
   } catch {
-    // interceptor already showed the error toast (e.g. insufficient stock)
+    // interceptor handled error
   } finally {
     submitting.value = false
   }
@@ -132,7 +132,7 @@ async function handleReturnSubmit() {
     returnForm.lines = [{ borrowItemId: null, qty: 1 }]
     returnFormRef.value.clearValidate()
   } catch {
-    // interceptor already showed the error toast
+    // interceptor handled error
   } finally {
     submittingReturn.value = false
   }
@@ -141,156 +141,294 @@ async function handleReturnSubmit() {
 
 <template>
   <div class="borrow-form-view">
-    <h1 class="page-title">Tool Borrowing & Returns</h1>
-    <el-tabs v-model="activeTab">
+    <div class="tech-kicker">POST /api/borrow-requests · POST /{id}/returns</div>
+    <div class="page-header-row">
+      <div>
+        <h1 class="page-title">Borrowing</h1>
+        <p class="page-subtitle">Who holds what, and when it is due back to the warehouse store.</p>
+      </div>
+    </div>
+
+    <el-tabs v-model="activeTab" class="sf-borrow-tabs">
+      <!-- Tab 1: New Borrow Request -->
       <el-tab-pane label="New Borrow Request" name="new">
-        <el-card style="max-width: 640px">
-          <template #header>
-            <h2 class="section-title">New Borrow Request</h2>
-          </template>
+        <div class="sf-card-container">
+          <div class="sf-form-card">
+            <span class="sf-corner-mark top-left">+</span>
+            <span class="sf-corner-mark top-right">+</span>
+            <span class="sf-corner-mark bottom-left">+</span>
+            <span class="sf-corner-mark bottom-right">+</span>
 
-          <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
-            <el-form-item label="Location" prop="locationId">
-              <el-select
-                v-model="form.locationId"
-                placeholder="Select warehouse or site"
-                aria-label="Select location"
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="loc in locations"
-                  :key="loc.id"
-                  :label="loc.locationName"
-                  :value="loc.id"
-                />
-              </el-select>
-            </el-form-item>
+            <div class="card-header-bar">
+              <span class="header-tag">NEW REQUEST REQUISITION</span>
+            </div>
 
-            <el-form-item label="Items to Borrow">
-              <div v-for="(line, index) in form.lines" :key="index" class="item-row">
-                <el-form-item
-                  :prop="`lines.${index}.itemId`"
-                  :rules="lineItemIdRule()"
-                  class="item-select"
-                >
+            <div class="form-content">
+              <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
+                <el-form-item label="Origin Store Location" prop="locationId">
                   <el-select
-                    v-model="line.itemId"
-                    placeholder="Select item"
-                    :aria-label="`Select item for line ${index + 1}`"
-                    filterable
+                    v-model="form.locationId"
+                    placeholder="Select warehouse or site location"
+                    aria-label="Select location"
                     style="width: 100%"
                   >
                     <el-option
-                      v-for="item in items"
-                      :key="item.id"
-                      :label="`${item.itemCode} - ${item.name}`"
-                      :value="item.id"
+                      v-for="loc in locations"
+                      :key="loc.id"
+                      :label="loc.locationName"
+                      :value="loc.id"
                     />
                   </el-select>
                 </el-form-item>
-                <el-input-number
-                  v-model="line.qty"
-                  :min="1"
-                  :aria-label="`Quantity for line ${index + 1}`"
-                  controls-position="right"
-                />
-                <el-button
-                  type="danger"
-                  plain
-                  :disabled="form.lines.length === 1"
-                  :aria-label="`Remove line ${index + 1}`"
-                  @click="removeLine(index)"
-                >
-                  Remove
-                </el-button>
-              </div>
-              <el-button aria-label="Add another item line" @click="addLine">+ Add Item</el-button>
-            </el-form-item>
 
-            <el-form-item>
-              <el-button type="primary" :loading="submitting" :disabled="submitting" @click="handleSubmit">
-                Submit Borrow Request
-              </el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
+                <div class="form-section-title">EQUIPMENT LINES</div>
+
+                <div v-for="(line, index) in form.lines" :key="index" class="item-row">
+                  <div class="item-col">
+                    <el-form-item
+                      :prop="`lines.${index}.itemId`"
+                      :rules="lineItemIdRule()"
+                      style="margin-bottom: 0"
+                    >
+                      <el-select
+                        v-model="line.itemId"
+                        placeholder="Select item to borrow"
+                        :aria-label="`Select item for line ${index + 1}`"
+                        filterable
+                        style="width: 100%"
+                      >
+                        <el-option
+                          v-for="item in items"
+                          :key="item.id"
+                          :label="`${item.itemCode} — ${item.name}`"
+                          :value="item.id"
+                        />
+                      </el-select>
+                    </el-form-item>
+                  </div>
+                  <div class="qty-col">
+                    <el-input-number
+                      v-model="line.qty"
+                      :min="1"
+                      :aria-label="`Quantity for line ${index + 1}`"
+                      controls-position="right"
+                      style="width: 110px"
+                    />
+                  </div>
+                  <div class="action-col">
+                    <button
+                      type="button"
+                      class="sf-btn-danger"
+                      style="height: 32px; padding: 0 10px; font-size: 12px"
+                      :disabled="form.lines.length === 1"
+                      :aria-label="`Remove line ${index + 1}`"
+                      @click="removeLine(index)"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div class="add-row-container">
+                  <button
+                    type="button"
+                    class="sf-btn-secondary"
+                    aria-label="Add another item line"
+                    @click="addLine"
+                  >
+                    + Add Another Item
+                  </button>
+                </div>
+
+                <div class="submit-action-container">
+                  <button
+                    type="button"
+                    class="sf-btn-primary"
+                    style="height: 36px; padding: 0 18px"
+                    :disabled="submitting"
+                    @click="handleSubmit"
+                  >
+                    {{ submitting ? 'Submitting...' : 'Submit Borrow Request' }}
+                  </button>
+                </div>
+              </el-form>
+            </div>
+          </div>
+        </div>
       </el-tab-pane>
 
+      <!-- Tab 2: Process Return -->
       <el-tab-pane label="Process Return" name="return">
-        <el-card style="max-width: 640px">
-          <template #header>
-            <h2 class="section-title">Process Return</h2>
-          </template>
+        <div class="sf-card-container">
+          <div class="sf-form-card">
+            <span class="sf-corner-mark top-left">+</span>
+            <span class="sf-corner-mark top-right">+</span>
+            <span class="sf-corner-mark bottom-left">+</span>
+            <span class="sf-corner-mark bottom-right">+</span>
 
-          <el-form ref="returnFormRef" :model="returnForm" :rules="returnRules" label-position="top">
-            <el-form-item label="Borrow Request ID" prop="requestId">
-              <el-input-number
-                v-model="returnForm.requestId"
-                :min="1"
-                controls-position="right"
-                placeholder="Enter Borrow Request ID"
-                aria-label="Borrow Request ID"
-                style="width: 100%"
-              />
-            </el-form-item>
+            <div class="card-header-bar">
+              <span class="header-tag">RETURN PROCESSING</span>
+            </div>
 
-            <el-form-item label="Items to Return">
-              <div v-for="(line, index) in returnForm.lines" :key="index" class="item-row">
-                <el-form-item
-                  :prop="`lines.${index}.borrowItemId`"
-                  :rules="returnItemIdRule()"
-                  class="item-select"
-                >
+            <div class="form-content">
+              <el-form ref="returnFormRef" :model="returnForm" :rules="returnRules" label-position="top">
+                <el-form-item label="Borrow Request ID" prop="requestId">
                   <el-input-number
-                    v-model="line.borrowItemId"
+                    v-model="returnForm.requestId"
                     :min="1"
                     controls-position="right"
-                    placeholder="Borrow Item ID"
-                    :aria-label="`Borrow Item ID for line ${index + 1}`"
+                    placeholder="e.g. 1"
+                    aria-label="Borrow Request ID"
                     style="width: 100%"
                   />
                 </el-form-item>
-                <el-input-number
-                  v-model="line.qty"
-                  :min="1"
-                  :aria-label="`Return quantity for line ${index + 1}`"
-                  controls-position="right"
-                />
-                <el-button
-                  type="danger"
-                  plain
-                  :disabled="returnForm.lines.length === 1"
-                  :aria-label="`Remove return line ${index + 1}`"
-                  @click="removeReturnLine(index)"
-                >
-                  Remove
-                </el-button>
-              </div>
-              <el-button aria-label="Add another return item line" @click="addReturnLine">+ Add Item</el-button>
-            </el-form-item>
 
-            <el-form-item>
-              <el-button type="primary" :loading="submittingReturn" :disabled="submittingReturn" @click="handleReturnSubmit">
-                Process Return
-              </el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
+                <div class="form-section-title">ITEMS TO RETURN</div>
+
+                <div v-for="(line, index) in returnForm.lines" :key="index" class="item-row">
+                  <div class="item-col">
+                    <el-form-item
+                      :prop="`lines.${index}.borrowItemId`"
+                      :rules="returnItemIdRule()"
+                      style="margin-bottom: 0"
+                    >
+                      <el-input-number
+                        v-model="line.borrowItemId"
+                        :min="1"
+                        controls-position="right"
+                        placeholder="Borrow Item Line ID"
+                        :aria-label="`Borrow Item ID for line ${index + 1}`"
+                        style="width: 100%"
+                      />
+                    </el-form-item>
+                  </div>
+                  <div class="qty-col">
+                    <el-input-number
+                      v-model="line.qty"
+                      :min="1"
+                      :aria-label="`Return quantity for line ${index + 1}`"
+                      controls-position="right"
+                      style="width: 110px"
+                    />
+                  </div>
+                  <div class="action-col">
+                    <button
+                      type="button"
+                      class="sf-btn-danger"
+                      style="height: 32px; padding: 0 10px; font-size: 12px"
+                      :disabled="returnForm.lines.length === 1"
+                      :aria-label="`Remove line ${index + 1}`"
+                      @click="removeReturnLine(index)"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div class="add-row-container">
+                  <button
+                    type="button"
+                    class="sf-btn-secondary"
+                    aria-label="Add another return line"
+                    @click="addReturnLine"
+                  >
+                    + Add Return Line
+                  </button>
+                </div>
+
+                <div class="submit-action-container">
+                  <button
+                    type="button"
+                    class="sf-btn-primary"
+                    style="height: 36px; padding: 0 18px"
+                    :disabled="submittingReturn"
+                    @click="handleReturnSubmit"
+                  >
+                    {{ submittingReturn ? 'Processing...' : 'Confirm Return' }}
+                  </button>
+                </div>
+              </el-form>
+            </div>
+          </div>
+        </div>
       </el-tab-pane>
     </el-tabs>
   </div>
 </template>
 
 <style scoped>
-.item-row {
+.page-header-row {
   display: flex;
+  justify-content: space-between;
   align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 20px;
 }
 
-.item-select {
-  flex: 1;
-  margin-bottom: 0;
+.sf-card-container {
+  max-width: 680px;
+  margin-top: 10px;
+}
+
+.sf-form-card {
+  position: relative;
+  background-color: var(--siteflow-bg-card);
+  border: 1px solid var(--siteflow-border-color);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.card-header-bar {
+  padding: 12px 18px;
+  background-color: #0f1826;
+  border-bottom: 1px solid var(--siteflow-border-color);
+}
+
+.header-tag {
+  font-family: var(--siteflow-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--siteflow-text-placeholder);
+}
+
+.form-content {
+  padding: 22px 20px;
+}
+
+.form-section-title {
+  font-family: var(--siteflow-font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #6f8099;
+  margin: 16px 0 10px;
+}
+
+.item-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.item-col {
+  flex: 1 1 auto;
+}
+
+.qty-col {
+  flex: 0 0 auto;
+}
+
+.action-col {
+  flex: 0 0 auto;
+}
+
+.add-row-container {
+  margin-top: 8px;
+  margin-bottom: 20px;
+}
+
+.submit-action-container {
+  padding-top: 16px;
+  border-top: 1px solid var(--siteflow-border-subtle);
 }
 </style>

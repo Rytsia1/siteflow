@@ -1,23 +1,31 @@
 /* ==========================================================================
-   SiteFlow Accessibility & Theme Design System (WCAG 2.1 AA Compliant)
+   SiteFlow Industrial Design System & Accessibility (WCAG 2.1 AA Compliant)
    ========================================================================== */
 
 :root {
-  /* High-contrast color tokens (Light Mode) */
+  /* High-contrast color tokens (Light Mode / Baseline) */
   --siteflow-bg-page: #f5f7fa;
   --siteflow-bg-card: #ffffff;
+  --siteflow-bg-surface: #f0f2f5;
   --siteflow-border-color: #dcdfe6;
+  --siteflow-border-subtle: #e2e8f0;
   --siteflow-text-primary: #1f2f3d;
   --siteflow-text-regular: #4a5568;
   --siteflow-text-muted: #595959;
   --siteflow-text-placeholder: #718096;
-  --siteflow-link-color: #2b6cb0;
+  --siteflow-link-color: #2b73c4;
   --siteflow-link-hover: #1a4971;
 
   /* Focus Indicator Ring */
-  --siteflow-focus-ring-color: #409eff;
+  --siteflow-focus-ring-color: #4e88c4;
   --siteflow-focus-ring-offset: 2px;
   --siteflow-focus-ring-width: 2px;
+
+  /* Primary Brand Action Colors */
+  --siteflow-primary: #2f6da8;
+  --siteflow-primary-hover: #3a7cbb;
+  --siteflow-primary-active: #245888;
+  --siteflow-accent: #8fb6dd;
 
   /* Status Colors with Verified AA Contrast (>= 4.5:1 text on badge) */
   --siteflow-status-success-bg: #e1f3d8;
@@ -28,46 +36,96 @@
   --siteflow-status-danger-text: #991b1b;
   --siteflow-status-info-bg: #e9e9eb;
   --siteflow-status-info-text: #374151;
+
+  /* Fonts */
+  --siteflow-font-body: 'Barlow', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --siteflow-font-heading: 'Barlow Condensed', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --siteflow-font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 html.dark {
-  /* High-contrast color tokens (Dark Mode) */
-  --siteflow-bg-page: #121212;
-  --siteflow-bg-card: #1e1e1e;
-  --siteflow-border-color: #363636;
+  /* Industrial Dark Palette */
+  --siteflow-bg-page: #0b1120;
+  --siteflow-bg-card: #111827;
+  --siteflow-bg-surface: #0e1626;
+  --siteflow-bg-sidebar: #0d1424;
+  --siteflow-bg-header: #0d1424;
+  --siteflow-border-color: #1c2739;
+  --siteflow-border-subtle: #243047;
   --siteflow-text-primary: #f0f2f5;
-  --siteflow-text-regular: #d1d5db;
-  --siteflow-text-muted: #9ca3af;
-  --siteflow-text-placeholder: #6b7280;
-  --siteflow-link-color: #79bbff;
-  --siteflow-link-hover: #a0cfff;
+  --siteflow-text-regular: #dcdfe6;
+  --siteflow-text-muted: #a0a8b4;
+  --siteflow-text-placeholder: #6f8099;
+  --siteflow-link-color: #8fb6dd;
+  --siteflow-link-hover: #bbd4ec;
 
-  /* Dark Mode Focus Ring */
-  --siteflow-focus-ring-color: #79bbff;
+  /* Focus Ring */
+  --siteflow-focus-ring-color: #4e88c4;
 
-  /* Dark Mode Status Badges */
-  --siteflow-status-success-bg: #132e18;
-  --siteflow-status-success-text: #67c23a;
-  --siteflow-status-warning-bg: #332514;
-  --siteflow-status-warning-text: #e6a23c;
-  --siteflow-status-danger-bg: #3b1818;
-  --siteflow-status-danger-text: #f56c6c;
-  --siteflow-status-info-bg: #262729;
-  --siteflow-status-info-text: #909399;
+  /* Status Badges with Subtle Tints and Tinted Borders */
+  --siteflow-status-success-bg: rgba(95, 192, 138, 0.08);
+  --siteflow-status-success-text: #5fc08a;
+  --siteflow-status-success-border: rgba(95, 192, 138, 0.32);
+
+  --siteflow-status-warning-bg: rgba(224, 177, 82, 0.08);
+  --siteflow-status-warning-text: #e0b152;
+  --siteflow-status-warning-border: rgba(224, 177, 82, 0.32);
+
+  --siteflow-status-danger-bg: rgba(196, 89, 79, 0.08);
+  --siteflow-status-danger-text: #e8756a;
+  --siteflow-status-danger-border: rgba(196, 89, 79, 0.34);
+
+  --siteflow-status-info-bg: rgba(143, 182, 221, 0.08);
+  --siteflow-status-info-text: #8fb6dd;
+  --siteflow-status-info-border: rgba(143, 182, 221, 0.3);
 }
 
 /* ==========================================================================
    Global Typography & Layout Defaults
    ========================================================================== */
 
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--siteflow-font-body);
   color: var(--siteflow-text-regular);
   background-color: var(--siteflow-bg-page);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--siteflow-link-color);
+  text-decoration: none;
+  transition: color 0.12s ease;
+}
+
+a:hover {
+  color: var(--siteflow-link-hover);
+}
+
+::selection {
+  background: rgba(78, 136, 196, 0.32);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--siteflow-bg-page);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--siteflow-border-subtle);
+  border: 2px solid var(--siteflow-bg-page);
+  border-radius: 4px;
 }
 
 /* ==========================================================================
@@ -104,13 +162,17 @@ body {
   outline-offset: var(--siteflow-focus-ring-offset) !important;
 }
 
-/* Ensure Element Plus inputs, buttons, and custom controls have clear focus */
+/* Ensure controls have clear focus states */
 .el-button:focus-visible,
 .el-input__inner:focus-visible,
 .el-textarea__inner:focus-visible,
 .el-select__wrapper:focus-visible,
 .el-menu-item:focus-visible,
-.el-radio-button__inner:focus-visible {
+.el-radio-button__inner:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
   outline: var(--siteflow-focus-ring-width) solid var(--siteflow-focus-ring-color) !important;
   outline-offset: var(--siteflow-focus-ring-offset) !important;
 }
@@ -131,7 +193,6 @@ body {
   border: 0 !important;
 }
 
-/* Focusable when tabbed into (e.g. table summary or accessible controls) */
 .sr-only-focusable:focus {
   position: static !important;
   width: auto !important;
@@ -143,17 +204,50 @@ body {
 }
 
 /* ==========================================================================
-   Accessible Page Headings & Typography
+   Accessible Page Headings & Technical Typography
    ========================================================================== */
 
 .page-title {
-  font-size: 22px;
-  font-weight: 700;
+  font-family: var(--siteflow-font-heading);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--siteflow-text-primary);
-  margin: 0 0 20px 0;
+  margin: 0 0 6px 0;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: var(--siteflow-text-muted);
+  margin: 0 0 20px 0;
+}
+
+.section-title {
+  font-family: var(--siteflow-font-heading);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--siteflow-text-primary);
+  margin: 0 0 10px 0;
+  text-transform: uppercase;
+}
+
+.tech-kicker {
+  font-family: var(--siteflow-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: #7396c0;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.code-id {
+  font-family: var(--siteflow-font-mono);
+  font-size: 12.5px;
+  color: var(--siteflow-accent);
 }
 
 /* ==========================================================================
@@ -163,7 +257,9 @@ body {
 .accessible-table-container {
   width: 100%;
   overflow-x: auto;
-  border-radius: 4px;
+  border-radius: 3px;
+  border: 1px solid var(--siteflow-border-color);
+  background-color: var(--siteflow-bg-card);
 }
 
 .accessible-table-container:focus-visible {
@@ -172,39 +268,253 @@ body {
 }
 
 /* ==========================================================================
-   High-Contrast Status Indicators (Color + Text/Icon Non-Color Indicators)
+   High-Contrast Status Badges & Pills (Color + Text/Icon Indicators)
    ========================================================================== */
 
 .status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  font-weight: 500;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--siteflow-font-mono);
+  letter-spacing: 0.04em;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 2px;
+  white-space: nowrap;
 }
 
 .status-badge.success {
   background-color: var(--siteflow-status-success-bg);
   color: var(--siteflow-status-success-text);
-  border: 1px solid var(--siteflow-status-success-text);
+  border: 1px solid var(--siteflow-status-success-border, var(--siteflow-status-success-text));
 }
 
 .status-badge.warning {
   background-color: var(--siteflow-status-warning-bg);
   color: var(--siteflow-status-warning-text);
-  border: 1px solid var(--siteflow-status-warning-text);
+  border: 1px solid var(--siteflow-status-warning-border, var(--siteflow-status-warning-text));
 }
 
 .status-badge.danger {
   background-color: var(--siteflow-status-danger-bg);
   color: var(--siteflow-status-danger-text);
-  border: 1px solid var(--siteflow-status-danger-text);
+  border: 1px solid var(--siteflow-status-danger-border, var(--siteflow-status-danger-text));
 }
 
 .status-badge.info {
   background-color: var(--siteflow-status-info-bg);
   color: var(--siteflow-status-info-text);
-  border: 1px solid var(--siteflow-status-info-text);
+  border: 1px solid var(--siteflow-status-info-border, var(--siteflow-status-info-text));
+}
+
+/* ==========================================================================
+   Industrial Technical Components (Cards, Tiles, Crosshairs)
+   ========================================================================== */
+
+.sf-stat-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  background-color: var(--siteflow-border-color);
+  border: 1px solid var(--siteflow-border-color);
+  margin-bottom: 24px;
+}
+
+.sf-stat-tile {
+  position: relative;
+  flex: 1 1 180px;
+  min-width: 0;
+  text-align: left;
+  border: 0;
+  background-color: var(--siteflow-bg-card);
+  padding: 16px 16px 14px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.sf-stat-tile:hover {
+  background-color: rgba(22, 32, 51, 0.9);
+}
+
+.sf-corner-mark {
+  position: absolute;
+  font-family: var(--siteflow-font-mono);
+  font-size: 10px;
+  line-height: 1;
+  color: #2c3a53;
+  user-select: none;
+}
+
+.sf-corner-mark.top-left { top: 3px; left: 4px; }
+.sf-corner-mark.top-right { top: 3px; right: 4px; }
+.sf-corner-mark.bottom-left { bottom: 3px; left: 4px; }
+.sf-corner-mark.bottom-right { bottom: 3px; right: 4px; }
+
+.sf-stat-label {
+  font-family: var(--siteflow-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--siteflow-text-placeholder);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.sf-stat-value {
+  font-family: var(--siteflow-font-heading);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.sf-stat-note {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--siteflow-text-muted);
+}
+
+/* Primary Button Styling */
+.sf-btn-primary {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid #4e88c4;
+  background-color: #2f6da8;
+  color: #f2f7fc;
+  border-radius: 3px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.12s ease;
+}
+
+.sf-btn-primary:hover:not(:disabled) {
+  background-color: #3a7cbb;
+}
+
+.sf-btn-secondary {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--siteflow-border-subtle);
+  background-color: #141d2e;
+  color: #c6d3e6;
+  border-radius: 3px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+
+.sf-btn-secondary:hover:not(:disabled) {
+  border-color: #31405c;
+  color: #e6edf7;
+}
+
+.sf-btn-danger {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #4a3436;
+  background-color: transparent;
+  color: #e8756a;
+  border-radius: 3px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.sf-btn-danger:hover:not(:disabled) {
+  background-color: rgba(196, 89, 79, 0.1);
+}
+
+/* ==========================================================================
+   Element Plus Dark Overrides for Industrial Theme
+   ========================================================================== */
+
+html.dark .el-table {
+  --el-table-bg-color: var(--siteflow-bg-card);
+  --el-table-tr-bg-color: var(--siteflow-bg-card);
+  --el-table-header-bg-color: #0f1826;
+  --el-table-border-color: #182236;
+  --el-table-row-hover-bg-color: #162033;
+  --el-table-text-color: var(--siteflow-text-regular);
+  --el-table-header-text-color: #7a8aa3;
+}
+
+html.dark .el-table th.el-table__cell {
+  font-family: var(--siteflow-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  text-transform: uppercase;
+  background-color: #0f1826 !important;
+  border-bottom: 1px solid var(--siteflow-border-subtle);
+}
+
+html.dark .el-table td.el-table__cell {
+  border-bottom: 1px solid #182236;
+}
+
+html.dark .el-card {
+  background-color: var(--siteflow-bg-card);
+  border-color: var(--siteflow-border-color);
+  color: var(--siteflow-text-regular);
+}
+
+html.dark .el-card__header {
+  border-bottom-color: var(--siteflow-border-color);
+  background-color: #0f1826;
+}
+
+html.dark .el-dialog,
+html.dark .el-drawer {
+  background-color: var(--siteflow-bg-card);
+  border: 1px solid var(--siteflow-border-subtle);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+html.dark .el-dialog__header,
+html.dark .el-drawer__header {
+  border-bottom: 1px solid var(--siteflow-border-color);
+  background-color: #0f1826;
+  margin-right: 0;
+  padding: 16px 20px;
+}
+
+html.dark .el-input__wrapper,
+html.dark .el-select__wrapper,
+html.dark .el-textarea__inner {
+  background-color: #0e1626 !important;
+  border-color: var(--siteflow-border-subtle) !important;
+  box-shadow: 0 0 0 1px var(--siteflow-border-subtle) inset !important;
+  color: var(--siteflow-text-primary) !important;
+}
+
+html.dark .el-input__inner {
+  color: var(--siteflow-text-primary) !important;
+}
+
+html.dark .el-pagination button {
+  background-color: #141d2e !important;
+  border: 1px solid var(--siteflow-border-subtle) !important;
+  color: var(--siteflow-text-regular) !important;
+}
+
+html.dark .el-pagination .el-pager li {
+  background-color: #0e1626 !important;
+  border: 1px solid var(--siteflow-border-subtle) !important;
+  color: var(--siteflow-text-regular) !important;
+}
+
+html.dark .el-pagination .el-pager li.is-active {
+  background-color: #2f6da8 !important;
+  border-color: #4e88c4 !important;
+  color: #f2f7fc !important;
 }
