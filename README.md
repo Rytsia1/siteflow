@@ -297,11 +297,61 @@ mysql -u root -p -e "CREATE DATABASE siteflow;"
 export DB_USERNAME=root
 export DB_PASSWORD=your-local-mysql-password
 
-# 3. Run the API — Flyway applies all migrations and seed data automatically on startup
-mvn spring-boot:run
+# 3. Run the API — Flyway applies all database schema migrations automatically on startup.
+#    To load development seed users ('admin', 'gudang', 'pekerja'), run with the 'dev' profile:
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-The API starts on `http://localhost:8080` (or `SERVER_PORT` if set). Three dev accounts are seeded by `V3__seed_users.sql` (`admin`, `gudang`, `pekerja` — one per role) with BCrypt-hashed passwords; see that migration file for details before using them.
+The API starts on `http://localhost:8080` (or `SERVER_PORT` if set). When running with the `dev` profile (`-Dspring-boot.run.profiles=dev`), local development accounts are seeded via `db/dev-seed/R__dev_seed_users.sql`.
+
+### Production Administrator Provisioning
+
+In production environments, SiteFlow **fails closed**: the core Flyway migration chain does not create any default or demo accounts, ensuring no default credentials exist.
+
+Before users can log in, an initial administrator account must be explicitly provisioned for the environment using one of the following methods:
+
+#### Method 1: Interactive Provisioning Script (Recommended)
+
+Run the provisioning script, which interactively prompts for the administrative username, full name, and securely reads the password without echoing it to the terminal:
+
+- **Linux / macOS**:
+  ```bash
+  ./scripts/provision-admin.sh
+  ```
+- **Windows (PowerShell)**:
+  ```powershell
+  .\scripts\provision-admin.ps1
+  ```
+
+#### Method 2: Spring Boot CLI Runner (Automated / Container Deployment)
+
+Provision the administrator directly via the application entry point using CLI arguments or environment variables:
+
+```bash
+java -jar target/siteflow-0.0.1-SNAPSHOT.jar \
+  --siteflow.provision-admin=true \
+  --siteflow.admin.username=site_admin \
+  --siteflow.admin.password='YourStrongSecretPassword123!' \
+  --siteflow.admin.full-name="Site Administrator" \
+  --siteflow.provision-admin.exit-after=true
+```
+
+Or via environment variables:
+
+```bash
+export SITEFLOW_PROVISION_ADMIN=true
+export SITEFLOW_ADMIN_USERNAME=site_admin
+export SITEFLOW_ADMIN_PASSWORD='YourStrongSecretPassword123!'
+export SITEFLOW_PROVISION_ADMIN_EXIT_AFTER=true
+
+java -jar target/siteflow-0.0.1-SNAPSHOT.jar
+```
+
+**Security Rules Enforced by Provisioning:**
+- The password must be at least 8 characters long.
+- Known default, weak, or demo passwords (e.g. `admin123`, `password`, `12345678`) are automatically rejected.
+- Passwords are encrypted using BCrypt before storing in the database.
+- An auditable `USER_PROVISIONED` event is recorded.
 
 ### Frontend (Vue 3 SPA)
 
@@ -346,7 +396,7 @@ All endpoints are under `/api`, secured with HTTP Basic auth, and return the sta
 | Analytics | `GET /api/analytics/tool-utilization` | ADMIN |
 | Analytics | `GET /api/analytics/forecast/{itemId}` | ADMIN |
 
-\* `PROCUREMENT` is referenced in `@PreAuthorize("hasAnyRole('ADMIN', 'PROCUREMENT')")` on the Procurement controller but is **not** one of the three roles seeded by `V3__seed_users.sql`. In the current codebase these endpoints are reachable only by `ADMIN` until a `PROCUREMENT` role is seeded.
+\* `PROCUREMENT` is referenced in `@PreAuthorize("hasAnyRole('ADMIN', 'PROCUREMENT')")` on the Procurement controller but is **not** currently assigned to any initial user. In the current codebase these endpoints are reachable only by `ADMIN` until a `PROCUREMENT` role user is provisioned.
 
 ## Screenshots
 
@@ -542,7 +592,7 @@ No license has been specified for this repository. All rights reserved by defaul
 
 ## Development Notes
 
-- **Flyway** manages the schema end-to-end: `V1__init_schema.sql` (core MVP schema), `V2__seed_reference_data.sql` (roles), `V3__seed_users.sql` (dev accounts), `V4__seed_sample_data.sql` (sample items/locations/stock), `V5__v2_management_schema.sql` (asset tracking, approval workflow columns, procurement pipeline), `V6__improve_schema_integrity_and_indexes.sql` (borrow request timestamps, analytics index), `V7__material_request_approval_audit.sql` (material request approval audit columns and REJECTED status), `V8__item_instance_borrow_tracking.sql` (instance checkout tracking), `V9__duplicate_prevention_and_integrity.sql` (unique constraints and duplicate prevention), `V10__performance_optimization_indexes.sql` (composite query indexes), `V11__user_lifecycle_and_governance.sql` (user deactivation and anonymization columns), and `V12__audit_trail_and_accountability.sql` (audit event fields, decoupled foreign keys, and audit query indexes). `baseline-on-migrate` is enabled and migrations run automatically on application startup — there is no manual migration step.
+- **Flyway** manages the schema end-to-end: `V1__init_schema.sql` (core MVP schema), `V2__seed_reference_data.sql` (roles), `V3__seed_users.sql` (deprecated default credentials; demo users isolated to dev profile `db/dev-seed/`), `V4__seed_sample_data.sql` (sample items/locations/stock), `V5__v2_management_schema.sql` (asset tracking, approval workflow columns, procurement pipeline), `V6__improve_schema_integrity_and_indexes.sql` (borrow request timestamps, analytics index), `V7__material_request_approval_audit.sql` (material request approval audit columns and REJECTED status), `V8__item_instance_borrow_tracking.sql` (instance checkout tracking), `V9__duplicate_prevention_and_integrity.sql` (unique constraints and duplicate prevention), `V10__performance_optimization_indexes.sql` (composite query indexes), `V11__user_lifecycle_and_governance.sql` (user deactivation and anonymization columns), `V12__audit_trail_and_accountability.sql` (audit event fields, decoupled foreign keys, and audit query indexes), and `V13__disable_default_seed_credentials.sql` (safely deactivates and neutralizes legacy default seed credentials in existing databases without breaking foreign key integrity). `baseline-on-migrate` is enabled and migrations run automatically on application startup — there is no manual migration step.
 - **MyBatis** is used exclusively (no JPA/Hibernate). Simple CRUD mappers use `@Select`/`@Insert`/`@Update` with `map-underscore-to-camel-case: true`; multi-table read views use `@ConstructorArgs`/`@Arg` to project joined query results directly into Java records (e.g. `ItemSummaryView`, `BorrowRequestView`) without an ORM layer in between.
 - **Spring Security** is configured as fully stateless (`SessionCreationPolicy.STATELESS`) with HTTP Basic and CSRF disabled, since there is no server-side session or cookie-based flow — every request re-authenticates against the database via a custom `UserDetailsService`. Method-level authorization uses `@EnableMethodSecurity` with `@PreAuthorize` on every controller method.
 - **Transactional workflows**: multi-step writes (creating a borrow request across several items, submitting a material request with line items, generating a purchase order) are wrapped in a single `@Transactional` service method so a failure partway through rolls back the entire operation rather than leaving partial rows.

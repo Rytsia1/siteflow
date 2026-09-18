@@ -34,6 +34,25 @@ public interface UserMapper {
             + "WHERE r.role_name = 'ADMIN' AND u.is_active = TRUE")
     int countActiveAdmins();
 
+    @Select("SELECT id FROM roles WHERE role_name = #{roleName}")
+    Long findRoleIdByName(String roleName);
+
+    @Select("SELECT id, role_id, username, password_hash, full_name, job_position, "
+            + "is_active, deactivated_at, created_at, updated_at "
+            + "FROM users WHERE username = #{username}")
+    User findUserEntityByUsername(String username);
+
+    @org.apache.ibatis.annotations.Insert(
+            "INSERT INTO users (role_id, username, password_hash, full_name, job_position, is_active, created_at, updated_at) "
+            + "VALUES (#{roleId}, #{username}, #{passwordHash}, #{fullName}, #{jobPosition}, #{isActive}, #{createdAt}, #{updatedAt})")
+    @org.apache.ibatis.annotations.Options(useGeneratedKeys = true, keyProperty = "id")
+    int insertUser(User user);
+
+    @Update("UPDATE users SET password_hash = #{passwordHash}, full_name = #{fullName}, "
+            + "job_position = #{jobPosition}, is_active = TRUE, deactivated_at = NULL, updated_at = #{updatedAt} "
+            + "WHERE id = #{id}")
+    int updateProvisionedUser(User user);
+
     @Update("UPDATE users SET is_active = FALSE, full_name = #{anonymizedName}, job_position = NULL, "
             + "password_hash = #{scrambledHash}, deactivated_at = #{deactivatedAt}, updated_at = #{deactivatedAt} "
             + "WHERE id = #{id}")

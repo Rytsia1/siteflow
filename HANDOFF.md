@@ -210,7 +210,7 @@ All schema changes are versioned using Flyway in `src/main/resources/db/migratio
 |---|---|---|
 | `V1__init_schema.sql` | Baseline MVP schema | `roles`, `users`, `locations`, `items`, `item_stocks`, `borrow_requests`, `borrow_items`, `transaction_logs` |
 | `V2__seed_reference_data.sql` | Core reference data | Default roles (`ADMIN`, `WAREHOUSE_STAFF`, `FIELD_STAFF`) and warehouse locations |
-| `V3__seed_users.sql` | Initial user accounts | Seeded admin, warehouse staff, and field staff accounts with hashed passwords |
+| `V3__seed_users.sql` | Legacy seed deprecation | Deprecated from production migration chain; demo fixtures isolated to dev profile `db/dev-seed/` |
 | `V4__seed_sample_data.sql` | Initial demo inventory | Seeded tools (`TOOL`), consumables (`CONSUMABLE`), and lifting gear |
 | `V5__v2_management_schema.sql` | Advanced management | `material_requests`, `material_request_items`, `purchase_orders` |
 | `V6__improve_schema_integrity_and_indexes.sql` | Foreign key constraints | Cascade and restrict rules on relational joins |
@@ -219,6 +219,8 @@ All schema changes are versioned using Flyway in `src/main/resources/db/migratio
 | `V9__duplicate_prevention_and_integrity.sql` | Idempotency engine | `idempotency_keys` table with expiration timestamps |
 | `V10__performance_optimization_indexes.sql` | Composite query indexes | Composite indexes on `borrow_requests`, `material_requests`, and `transaction_logs` |
 | `V11__user_lifecycle_and_governance.sql` | Privacy & lifecycle governance | Adds `is_active`, `deactivated_at`, and `idx_users_is_active` to `users` |
+| `V12__audit_trail_and_accountability.sql` | Audit logging engine | Adds audit columns, decoupled foreign keys, and indexes on `transaction_logs` |
+| `V13__disable_default_seed_credentials.sql` | Default credential neutralization | Deactivates legacy demo accounts and scrambles password hashes in existing DBs |
 
 ---
 

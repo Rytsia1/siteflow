@@ -1,0 +1,11 @@
+# =========================================================================
+# SiteFlow Development Profile Configuration
+#
+# Activated with:
+#   SPRING_PROFILES_ACTIVE=dev
+#   mvn spring-boot:run -Dspring-boot.run.profiles=dev
+# =========================================================================
+
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/dev-seed
