@@ -28,7 +28,7 @@ async function handleSubmit() {
       username: form.username,
       password: form.password,
     })
-    loginSuccess(data.accessToken, data.username || form.username, data.role)
+    loginSuccess(data.username || form.username, data.role)
     router.push('/inventory')
   } catch {
     // interceptor handled error

@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getErrorMessage, isMutationMethod, dispatchApiError } from './error-handler.js'
-import { timeout } from './http.js'
+import { timeout, getCookie } from './http.js'
+import { auth, loginSuccess, logout, isAuthenticated } from '../auth.js'
 
 test('1. Successful request clears loading state', async () => {
   let loading = true
@@ -279,3 +280,82 @@ test('14. 409 Conflict displays server error message on duplicate submission or 
   const fallbackMsg = getErrorMessage(fallbackConflict)
   assert.strictEqual(fallbackMsg, 'Conflict: The operation cannot be completed in the current state.')
 })
+
+test('15. loginSuccess does NOT store or expose raw JWT token in auth state or sessionStorage', () => {
+  // Mock sessionStorage in test environment
+  const mockStorage = {}
+  global.sessionStorage = {
+    getItem: (key) => mockStorage[key] || null,
+    setItem: (key, val) => {
+      mockStorage[key] = String(val)
+    },
+    removeItem: (key) => {
+      delete mockStorage[key]
+    },
+  }
+
+  // Simulate login
+  const sensitiveJwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.sensitivePayload.signature'
+  loginSuccess(sensitiveJwt, 'testuser', 'ADMIN')
+
+  assert.strictEqual(auth.username, 'testuser')
+  assert.strictEqual(auth.role, 'ADMIN')
+  assert.strictEqual(auth.authenticated, true)
+  assert.strictEqual(auth.token, null, 'auth.token must be strictly null to protect against XSS token theft')
+  assert.strictEqual(isAuthenticated(), true)
+
+  const stored = JSON.parse(mockStorage['siteflow.auth'])
+  assert.strictEqual(stored.username, 'testuser')
+  assert.strictEqual(stored.role, 'ADMIN')
+  assert.strictEqual(stored.authenticated, true)
+  assert.strictEqual(stored.token, undefined, 'Stored session must contain no token')
+  assert.ok(!JSON.stringify(stored).includes('eyJ'), 'Serialized session storage must not contain JWT strings')
+
+  // Clean up
+  logout()
+  assert.strictEqual(isAuthenticated(), false)
+  assert.strictEqual(auth.username, null)
+  assert.strictEqual(mockStorage['siteflow.auth'], undefined)
+})
+
+test('16. getCookie accurately parses cookie values including XSRF-TOKEN', () => {
+  // When document is undefined, returns null
+  const savedDoc = global.document
+  delete global.document
+  assert.strictEqual(getCookie('XSRF-TOKEN'), null)
+
+  // With document.cookie mocked
+  global.document = {
+    cookie: 'theme=dark; XSRF-TOKEN=test-csrf-token-12345; other=abc',
+  }
+  assert.strictEqual(getCookie('XSRF-TOKEN'), 'test-csrf-token-12345')
+  assert.strictEqual(getCookie('theme'), 'dark')
+  assert.strictEqual(getCookie('missing'), null)
+
+  // Restore document
+  if (savedDoc) global.document = savedDoc
+  else delete global.document
+})
+
+test('17. 401 handling logs out without creating infinite navigation loops', () => {
+  let logoutCalled = false
+  let navigations = 0
+
+  dispatchApiError(
+    { response: { status: 401 } },
+    {
+      onLogout: () => {
+        logoutCalled = true
+      },
+      onNavigate: () => {
+        navigations++
+      },
+      showMessage: () => {},
+      currentPath: '/login', // already on login page
+    },
+  )
+
+  assert.strictEqual(logoutCalled, true)
+  assert.strictEqual(navigations, 0, 'Must not trigger navigation if already on /login')
+})
+

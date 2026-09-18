@@ -24,15 +24,23 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    public static final String AUTH_VIA_COOKIE_ATTR = "siteflow.auth.via_cookie";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserMapper userMapper;
+    private final AuthCookieService authCookieService;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, UserMapper userMapper) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, UserMapper userMapper, AuthCookieService authCookieService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.userMapper = userMapper;
+        this.authCookieService = authCookieService;
+    }
+
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, UserMapper userMapper) {
+        this(jwtTokenProvider, userMapper, null);
     }
 
     @Override
@@ -125,6 +133,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {
             return bearerToken.substring(BEARER_PREFIX.length()).trim();
+        }
+        if (authCookieService != null) {
+            String cookieToken = authCookieService.extractAuthToken(request);
+            if (StringUtils.hasText(cookieToken)) {
+                request.setAttribute(AUTH_VIA_COOKIE_ATTR, Boolean.TRUE);
+                return cookieToken.trim();
+            }
         }
         return null;
     }

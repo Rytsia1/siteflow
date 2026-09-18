@@ -309,9 +309,15 @@ async function handleNotificationClick(item) {
   }
 }
 
-function handleLogout() {
-  logout()
-  router.push('/login')
+async function handleLogout() {
+  try {
+    await http.post('/auth/logout')
+  } catch {
+    // ignore network/session errors during logout
+  } finally {
+    logout()
+    router.push('/login')
+  }
 }
 
 // User initials avatar

@@ -34,18 +34,24 @@ public class SecurityConfig {
 
     private final CorrelationIdFilter correlationIdFilter;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CsrfProtectionFilter csrfProtectionFilter;
     private final RateLimitingFilter rateLimitingFilter;
     private final String allowedOrigins;
+    private final boolean allowCredentials;
 
     public SecurityConfig(
             CorrelationIdFilter correlationIdFilter,
             JwtAuthenticationFilter jwtAuthenticationFilter,
+            CsrfProtectionFilter csrfProtectionFilter,
             RateLimitingFilter rateLimitingFilter,
-            @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173}") String allowedOrigins) {
+            @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173}") String allowedOrigins,
+            @Value("${cors.allow-credentials:false}") boolean allowCredentials) {
         this.correlationIdFilter = correlationIdFilter;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.csrfProtectionFilter = csrfProtectionFilter;
         this.rateLimitingFilter = rateLimitingFilter;
         this.allowedOrigins = allowedOrigins;
+        this.allowCredentials = allowCredentials;
     }
 
     @Bean
@@ -68,9 +74,9 @@ public class SecurityConfig {
                 .toList();
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin", "X-Request-ID", "Idempotency-Key"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin", "X-Request-ID", "Idempotency-Key", "X-XSRF-TOKEN", "X-CSRF-TOKEN"));
         configuration.setExposedHeaders(List.of("Authorization", "X-Request-ID", "X-Total-Count", "X-Page-Number", "X-Page-Size", "X-Total-Pages"));
-        configuration.setAllowCredentials(false);
+        configuration.setAllowCredentials(allowCredentials);
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -86,7 +92,7 @@ public class SecurityConfig {
             throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
+                .csrf(csrf -> csrf.disable()) // Handled via CsrfProtectionFilter with Double Submit Cookie pattern
                 .headers(headers -> headers
                         .contentTypeOptions(Customizer.withDefaults())
                         .frameOptions(frame -> frame.deny())
@@ -103,10 +109,12 @@ public class SecurityConfig {
                         // Public Actuator health check endpoint for uptime monitors and container orchestrators
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(correlationIdFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(rateLimitingFilter, JwtAuthenticationFilter.class)
+                .addFilterAfter(csrfProtectionFilter, JwtAuthenticationFilter.class)
+                .addFilterAfter(rateLimitingFilter, CsrfProtectionFilter.class)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler));

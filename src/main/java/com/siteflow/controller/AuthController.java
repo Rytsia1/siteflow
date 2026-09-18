@@ -39,6 +39,7 @@ public class AuthController {
     private final RateLimitProperties rateLimitProperties;
     private final com.siteflow.service.AuditService auditService;
     private final com.siteflow.service.UserService userService;
+    private final com.siteflow.security.AuthCookieService authCookieService;
 
     @org.springframework.beans.factory.annotation.Autowired
     public AuthController(
@@ -47,13 +48,25 @@ public class AuthController {
             LoginAttemptService loginAttemptService,
             RateLimitProperties rateLimitProperties,
             com.siteflow.service.AuditService auditService,
-            com.siteflow.service.UserService userService) {
+            com.siteflow.service.UserService userService,
+            com.siteflow.security.AuthCookieService authCookieService) {
         this.authenticationManager = authenticationManager;
         this.jwtTokenProvider = jwtTokenProvider;
         this.loginAttemptService = loginAttemptService;
         this.rateLimitProperties = rateLimitProperties;
         this.auditService = auditService;
         this.userService = userService;
+        this.authCookieService = authCookieService;
+    }
+
+    public AuthController(
+            AuthenticationManager authenticationManager,
+            JwtTokenProvider jwtTokenProvider,
+            LoginAttemptService loginAttemptService,
+            RateLimitProperties rateLimitProperties,
+            com.siteflow.service.AuditService auditService,
+            com.siteflow.service.UserService userService) {
+        this(authenticationManager, jwtTokenProvider, loginAttemptService, rateLimitProperties, auditService, userService, null);
     }
 
     public AuthController(
@@ -62,7 +75,7 @@ public class AuthController {
             LoginAttemptService loginAttemptService,
             RateLimitProperties rateLimitProperties,
             com.siteflow.service.AuditService auditService) {
-        this(authenticationManager, jwtTokenProvider, loginAttemptService, rateLimitProperties, auditService, null);
+        this(authenticationManager, jwtTokenProvider, loginAttemptService, rateLimitProperties, auditService, null, null);
     }
 
     public AuthController(
@@ -70,7 +83,7 @@ public class AuthController {
             JwtTokenProvider jwtTokenProvider,
             LoginAttemptService loginAttemptService,
             RateLimitProperties rateLimitProperties) {
-        this(authenticationManager, jwtTokenProvider, loginAttemptService, rateLimitProperties, null, null);
+        this(authenticationManager, jwtTokenProvider, loginAttemptService, rateLimitProperties, null, null, null);
     }
 
     /**
@@ -80,7 +93,8 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<AuthTokenView> login(
             @Valid @RequestBody LoginRequestDto request,
-            HttpServletRequest httpRequest) {
+            HttpServletRequest httpRequest,
+            jakarta.servlet.http.HttpServletResponse httpResponse) {
         String clientIp = resolveClientIp(httpRequest);
 
         if (loginAttemptService.isBlocked(clientIp)) {
@@ -103,6 +117,10 @@ public class AuthController {
             String token = jwtTokenProvider.generateToken(principal);
             long expiresInSeconds = jwtTokenProvider.getExpirationMs() / 1000;
 
+            if (authCookieService != null && httpResponse != null) {
+                authCookieService.addAuthCookies(httpRequest, httpResponse, token, expiresInSeconds);
+            }
+
             AuthTokenView tokenView = new AuthTokenView(
                     token,
                     "Bearer",
@@ -123,6 +141,18 @@ public class AuthController {
     }
 
     /**
+     * Issues or refreshes a CSRF token and sets the XSRF-TOKEN cookie.
+     */
+    @GetMapping("/csrf")
+    public ApiResponse<java.util.Map<String, String>> csrf(HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
+        String csrfToken = "";
+        if (authCookieService != null && response != null) {
+            csrfToken = authCookieService.addCsrfCookie(request, response, 3600L);
+        }
+        return ApiResponse.success("CSRF token.", java.util.Map.of("csrfToken", csrfToken != null ? csrfToken : ""));
+    }
+
+    /**
      * Identifies the authenticated caller, including role, from the current JWT security context.
      */
     @GetMapping("/me")
@@ -133,13 +163,19 @@ public class AuthController {
     }
 
     /**
-     * Invalidates all active tokens for the authenticated caller by incrementing their token version.
+     * Invalidates all active tokens for the authenticated caller by incrementing their token version and clearing cookies.
      */
     @PostMapping("/logout")
     @PreAuthorize("isAuthenticated()")
-    public ApiResponse<Void> logout(@AuthenticationPrincipal UserPrincipal principal) {
+    public ApiResponse<Void> logout(
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest,
+            jakarta.servlet.http.HttpServletResponse httpResponse) {
         if (userService != null && principal != null && principal.getUserId() != null) {
             userService.revokeUserTokens(principal.getUserId());
+        }
+        if (authCookieService != null && httpResponse != null) {
+            authCookieService.clearAuthCookies(httpRequest, httpResponse);
         }
         return ApiResponse.success("Successfully logged out. All active sessions have been invalidated.", null);
     }

@@ -81,7 +81,7 @@ siteflow/
 │   │   ├── components/          # Reusable UI components
 │   │   ├── router/              # Route definitions and navigation guards
 │   │   ├── views/               # Page views (Dashboard, Borrow, Procurement, Privacy, Terms, etc.)
-│   │   └── auth.js              # Reactive auth state & token storage (sessionStorage)
+│   │   └── auth.js              # Reactive auth state (username, role; zero token storage)
 │   ├── package.json
 │   └── vite.config.js
 ├── pom.xml                      # Maven root build configuration
@@ -290,9 +290,9 @@ npm run dev
 - Error responses masked to prevent stack trace and SQL query leakage.
 
 ### C. Cookie & Storage Architecture
-- **Cookies**: 0 cookies used.
+- **Cookies**: Strictly necessary first-party cookies: `siteflow_token` (`HttpOnly`, `SameSite=Lax`, `Secure`, `Path=/`) isolating the JWT token from client scripts, and `XSRF-TOKEN` (`SameSite=Lax`, `Secure`, `Path=/`) for Double-Submit Cookie CSRF validation. Zero tracking or marketing cookies are used.
 - **LocalStorage**: Limited exclusively to user interface theme preference (`theme: 'dark' | 'light'`).
-- **SessionStorage**: `siteflow.auth` stores `{ username, token, role }` solely for the active tab session; purged on logout.
+- **SessionStorage**: Stores `{ username, role, authenticated }` solely for the active tab UI session; access tokens are strictly forbidden from browser storage and are never accessible to client scripts.
 - **Third-Party Trackers**: Zero tracking, analytics, or external telemetry libraries. Locally bundled UI assets.
 
 ### D. Account Deactivation & Data Anonymization

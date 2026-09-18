@@ -31,7 +31,7 @@ SiteFlow operates on the principle of strict **data minimization**: we collect o
 |---|---|---|---|---|
 | **Account Identity** | `username`, `full_name`, `job_position`, `role_id` | Identifies authorized workers and maps permissions for job-site actions | MySQL `users` table | Authenticated user (`/me`), Administrators |
 | **Authentication Credentials** | `password_hash` (BCrypt, 10 rounds), `id` | Verifies user authenticity during login | MySQL `users` table | Spring Security authentication provider only; **never exposed via API** |
-| **Active Session Token** | Stateless JWT (HMAC-SHA256, `sub`, `userId`, `role`) | Maintains session state across API requests | Client `sessionStorage` (`siteflow.auth`) | Browser runtime; cleared on logout/close |
+| **Active Session Token** | Stateless JWT (HMAC-SHA256, `sub`, `userId`, `role`) | Maintains session state across API requests | `HttpOnly`, `Secure`, `SameSite=Lax` Cookie (`siteflow_token`) | Browser runtime session; cleared on logout |
 | **Tool Custody & Borrowing** | `user_id`, `location_id`, `request_date`, `status`, `approved_by` | Tracks who has physical possession of tools and who authorized checkout | MySQL `borrow_requests`, `borrow_items` | Request owner, Warehouse Staff, Administrators |
 | **Procurement & Material Requests** | `requested_by`, `justification`, line items, `approved_by` | Tracks material requisitions and purchase orders for site construction | MySQL `material_requests`, `purchase_orders` | Request author, Procurement officers, Administrators |
 | **Inventory Ledger & Audit** | `item_id`, `location_id`, `user_id`, `qty_change`, `timestamp` | Immutable audit trail for equipment returns and warehouse adjustments | MySQL `transaction_logs` | Administrators (aggregate analytics only) |
@@ -57,9 +57,9 @@ SiteFlow **never** collects: personal email addresses, phone numbers, home addre
 
 ## 4. Cookies & Client-Side Storage Policy
 
-- **Cookies:** SiteFlow uses **0 cookies**. No session cookies, tracking cookies, or third-party cookies are set or read.
+- **Cookies:** SiteFlow uses strictly necessary, hardened first-party session cookies: `siteflow_token` (`HttpOnly`, `SameSite=Lax`, `Secure`, `Path=/`) storing the JWT session securely beyond the reach of client-side scripts, and `XSRF-TOKEN` (`SameSite=Lax`, `Secure`, `Path=/`) providing Double-Submit Cookie CSRF protection. Zero third-party, tracking, or marketing cookies are used.
 - **Local Storage:** `localStorage` is not used.
-- **Session Storage:** A single entry `siteflow.auth` holds `{ username, token, role }` in `sessionStorage` strictly to maintain the active authenticated session. This data is destroyed when the user clicks "Log Out" or closes the browser tab.
+- **Session Storage:** Browser `sessionStorage` (`siteflow.auth`) stores only non-sensitive UI state (`username`, `role`, `authenticated`) for active tab navigation. Access tokens are strictly forbidden from `sessionStorage` and are never accessible to client-side scripts.
 - **Third-Party Trackers:** No remote analytics libraries, fonts from external CDNs, or telemetry scripts are embedded. All assets and libraries (Vue 3, Element Plus, Chart.js) are bundled locally.
 
 ---

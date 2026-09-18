@@ -47,9 +47,9 @@
           <h2>4. Cookies & Client Storage Architecture</h2>
           <p>We believe in privacy by design and zero unnecessary tracking:</p>
           <ul>
-            <li><strong>Cookies:</strong> SiteFlow uses <strong>zero tracking or advertising cookies</strong>. No marketing or profiling cookies are ever placed on your device.</li>
+            <li><strong>Cookies:</strong> SiteFlow uses secure, strictly necessary session cookies (<code>HttpOnly</code>, <code>SameSite=Lax</code>, encrypted in transit) strictly for authentication and anti-CSRF protection. Zero advertising, tracking, or marketing cookies are ever placed on your device.</li>
             <li><strong>Local Storage:</strong> SiteFlow does not store authentication credentials or tracking tokens in persistent <code>localStorage</code>.</li>
-            <li><strong>Session Storage:</strong> A stateless JWT access token is held exclusively in browser <code>sessionStorage</code> for the duration of your active browser session and is automatically purged upon logout or browser tab closure.</li>
+            <li><strong>Session Storage:</strong> Browser <code>sessionStorage</code> holds only non-sensitive UI user preferences (username and role) during active sessions. Access tokens are strictly isolated in HttpOnly cookies and are never accessible to client-side scripts.</li>
             <li><strong>Third-Party Analytics:</strong> No third-party analytics trackers, telemetry collectors, social media pixels (e.g., Meta Pixel), or advertising beacons are loaded.</li>
           </ul>
         </section>

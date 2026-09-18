@@ -50,7 +50,7 @@ All features below are implemented in the current codebase (backend + frontend),
 
 | Feature | Description |
 |---|---|
-| **Authentication** | Stateless HTTP Basic authentication backed by Spring Security. Credentials are checked against the `users` table (BCrypt-hashed passwords); the frontend stores the Basic-auth token client-side for the session and resolves the user's role via `GET /api/auth/me` after login. |
+| **Authentication** | Hardened JWT session authentication backed by Spring Security. Credentials are authenticated against the `users` table (BCrypt-hashed passwords); browser clients receive an `HttpOnly`, `SameSite=Lax`, `Secure` session cookie (`siteflow_token`) with Double-Submit Cookie CSRF protection (`XSRF-TOKEN` and `X-XSRF-TOKEN` header), preventing XSS token exfiltration. Non-browser API clients can optionally authenticate via `Authorization: Bearer <token>`. User roles are resolved via `GET /api/auth/me` without exposing tokens to frontend JavaScript. |
 | **Role-based access control** | Three roles are seeded: `ADMIN`, `WAREHOUSE_STAFF`, `FIELD_STAFF`. Every backend endpoint is annotated with `@PreAuthorize`, and the frontend router additionally hides/blocks role-restricted views (e.g. Approvals, Analytics are ADMIN-only). |
 | **Inventory management** | Item catalog (`TOOL` / `CONSUMABLE` / `LIFTING_GEAR`) with per-location stock quantities and a configurable minimum-stock threshold per item. |
 | **Tool borrowing & return** | Field/warehouse staff submit a borrow request for one or more items at a location; stock is checked and decremented, and a transaction log entry is written. Returns are processed per line item and update stock and request status (`PARTIAL_RETURN` / `COMPLETED`) accordingly. |
@@ -207,8 +207,8 @@ siteflow/
     ├── src/
     │   ├── views/                       # One .vue file per screen (Login, Inventory, Borrow, Approvals, Assets, Procurement, Analytics)
     │   ├── router/index.js              # Routes + role-based navigation guard
-    │   ├── api/http.js                  # Axios instance, auth header, centralized error toasts
-    │   ├── auth.js                      # Client-side auth/session state (sessionStorage)
+    │   ├── api/http.js                  # Axios instance, withCredentials, CSRF header attachment, centralized error toasts
+    │   ├── auth.js                      # Client-side UI user state (username, role; zero token storage)
     │   └── App.vue                      # Shell layout + role-gated nav menu
     └── vite.config.js                   # Dev server + /api proxy (VITE_API_PROXY_TARGET, default localhost:8080)
 ```
@@ -447,9 +447,9 @@ SiteFlow collects only operational business data necessary to maintain physical 
 - **Audit Ledger**: Append-only `transaction_logs` tracking physical item custody transfers.
 
 ### 2. Cookie & Storage Architecture
-- **Cookies**: Zero cookies used (`document.cookie` is unused; no tracking or session cookies).
+- **Cookies**: Strictly necessary first-party cookies: `siteflow_token` (`HttpOnly`, `SameSite=Lax`, `Secure`, `Path=/`) isolating the JWT token from client scripts, and `XSRF-TOKEN` (`SameSite=Lax`, `Secure`, `Path=/`) for Double-Submit Cookie CSRF validation. Zero tracking or marketing cookies are used.
 - **Persistent Storage**: No tokens stored in persistent `localStorage`.
-- **Session Storage**: A short-lived JWT token is held in `sessionStorage` (`siteflow.auth`) for active tab requests and cleared on logout.
+- **Session Storage**: Holds only non-sensitive UI user preferences (`username`, `role`, `authenticated`) in `sessionStorage` (`siteflow.auth`) for active tab navigation. Access tokens are strictly forbidden from browser storage and are never accessible to client scripts.
 - **Third-Party Trackers**: Zero external trackers, analytics beacons, or remote CDN scripts. All libraries are bundled locally.
 
 ### 3. Account Deactivation & Data Anonymization

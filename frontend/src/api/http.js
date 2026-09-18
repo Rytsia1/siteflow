@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { auth, logout } from '../auth.js'
+import { logout } from '../auth.js'
 import { dispatchApiError } from './error-handler.js'
 
 // Timeout defaults to 15 seconds unless overridden by VITE_API_TIMEOUT
@@ -12,14 +12,25 @@ export function setRouter(router) {
   routerInstance = router
 }
 
+export function getCookie(name) {
+  if (typeof document === 'undefined' || !document.cookie) return null
+  const match = document.cookie.match(new RegExp('(^|;\\s*)' + name + '=([^;]*)'))
+  return match ? decodeURIComponent(match[2]) : null
+}
+
 const http = axios.create({
   baseURL: '/api',
   timeout,
+  withCredentials: true,
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
 })
 
 http.interceptors.request.use((config) => {
-  if (auth.token) {
-    config.headers.Authorization = `Bearer ${auth.token}`
+  // Read CSRF token from document.cookie and attach X-XSRF-TOKEN header for state-changing requests
+  const xsrfToken = getCookie('XSRF-TOKEN')
+  if (xsrfToken && !config.headers['X-XSRF-TOKEN']) {
+    config.headers['X-XSRF-TOKEN'] = xsrfToken
   }
   return config
 })
