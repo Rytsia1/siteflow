@@ -18,21 +18,21 @@ SiteFlow is an internal material and equipment logistics platform. In its standa
 
 | Package / Artifact | Version | License | Direct / Transitive | Runtime Critical | Processes User Data | Outgoing Network Calls |
 |---|---|---|---|---|---|---|
-| **Spring Boot Starter Web** (`org.springframework.boot`) | 3.5.0 | Apache-2.0 | Direct | Yes | Yes (HTTP requests) | None |
-| **Spring Boot Starter Validation** (`org.springframework.boot`) | 3.5.0 | Apache-2.0 | Direct | Yes | Yes (DTO validation) | None |
-| **Spring Boot Starter Cache** (`org.springframework.boot`) | 3.5.0 | Apache-2.0 | Direct | Yes | No (cache metadata) | None |
-| **Spring Boot Starter Actuator** (`org.springframework.boot`) | 3.5.0 | Apache-2.0 | Direct | Yes | No (health indicators) | None |
-| **Spring Boot Starter Security** (`org.springframework.boot`) | 3.5.0 | Apache-2.0 | Direct | Yes | Yes (auth credentials) | None |
-| **MyBatis Spring Boot Starter** (`org.mybatis.spring.boot`) | 3.0.4 | Apache-2.0 | Direct | Yes | Yes (SQL persistence) | None (Local DB only) |
-| **MySQL Connector/J** (`com.mysql:mysql-connector-j`) | 9.2.0 | GPL-2.0 with FOSS Exception | Direct | Yes | Yes (transmits queries) | Local / network MySQL |
+| **Spring Boot Starter Web** (`org.springframework.boot`) | 3.5.16 | Apache-2.0 | Direct | Yes | Yes (HTTP requests) | None |
+| **Spring Boot Starter Validation** (`org.springframework.boot`) | 3.5.16 | Apache-2.0 | Direct | Yes | Yes (DTO validation) | None |
+| **Spring Boot Starter Cache** (`org.springframework.boot`) | 3.5.16 | Apache-2.0 | Direct | Yes | No (cache metadata) | None |
+| **Spring Boot Starter Actuator** (`org.springframework.boot`) | 3.5.16 | Apache-2.0 | Direct | Yes | No (health indicators) | None |
+| **Spring Boot Starter Security** (`org.springframework.boot`) | 3.5.16 | Apache-2.0 | Direct | Yes | Yes (auth credentials) | None |
+| **MyBatis Spring Boot Starter** (`org.mybatis.spring.boot`) | 3.0.5 | Apache-2.0 | Direct | Yes | Yes (SQL persistence) | None (Local DB only) |
+| **MySQL Connector/J** (`com.mysql:mysql-connector-j`) | 9.7.0 | GPL-2.0 with FOSS Exception | Direct | Yes | Yes (transmits queries) | Local / network MySQL |
 | **Flyway Core & MySQL** (`org.flywaydb`) | 11.7.2 | Apache-2.0 | Direct | Yes | Yes (schema migrations) | Local / network MySQL |
-| **Project Lombok** (`org.projectlombok:lombok`) | 1.18.38 | MIT | Direct | No (compile-time) | No | None |
-| **JJWT** (`io.jsonwebtoken:jjwt-api`, `impl`, `jackson`) | 0.12.6 | Apache-2.0 | Direct | Yes | Yes (token claims) | None |
-| **Spring Boot Starter Test** (`org.springframework.boot`) | 3.5.0 | Apache-2.0 | Direct | No (test only) | No (mock data) | None |
-| **Spring Security Test** (`org.springframework.security`) | 6.5.0 | Apache-2.0 | Direct | No (test only) | No (mock data) | None |
-| **HikariCP** (`com.zaxxer:HikariCP`) | 6.3.0 | Apache-2.0 | Transitive | Yes | No (connection pooling) | Local / network MySQL |
-| **Jackson Databind** (`com.fasterxml.jackson.core`) | 2.19.0 | Apache-2.0 | Transitive | Yes | Yes (JSON parsing) | None |
-| **Logback Classic** (`ch.qos.logback:logback-classic`) | 1.5.18 | EPL-1.0 / LGPL-2.1 | Transitive | Yes | Yes (sanitized logs) | None |
+| **Project Lombok** (`org.projectlombok:lombok`) | 1.18.46 | MIT | Direct | No (compile-time) | No | None |
+| **JJWT** (`io.jsonwebtoken:jjwt-api`, `impl`, `jackson`) | 0.12.7 | Apache-2.0 | Direct | Yes | Yes (token claims) | None |
+| **Spring Boot Starter Test** (`org.springframework.boot`) | 3.5.16 | Apache-2.0 | Direct | No (test only) | No (mock data) | None |
+| **Spring Security Test** (`org.springframework.security`) | 6.5.11 | Apache-2.0 | Direct | No (test only) | No (mock data) | None |
+| **HikariCP** (`com.zaxxer:HikariCP`) | 6.3.3 | Apache-2.0 | Transitive | Yes | No (connection pooling) | Local / network MySQL |
+| **Jackson Databind** (`com.fasterxml.jackson.core`) | 2.21.4 | Apache-2.0 | Transitive | Yes | Yes (JSON parsing) | None |
+| **Logback Classic** (`ch.qos.logback:logback-classic`) | 1.5.34 | EPL-1.0 / LGPL-2.1 | Transitive | Yes | Yes (sanitized logs) | None |
 
 ---
 
@@ -103,7 +103,7 @@ A comprehensive audit of the frontend and backend source code confirms:
 1. **Automated Dependabot Monitoring**: `.github/dependabot.yml` is configured to run weekly dependency audits across both `maven` and `npm`.
 2. **Deterministic Locking**:
    - `frontend/package-lock.json` is committed and strictly enforces subdependency integrity.
-   - `pom.xml` pins dependencies via `spring-boot-starter-parent:3.5.0` without floating or dynamic version ranges.
+   - `pom.xml` pins dependencies via `spring-boot-starter-parent:3.5.16` without floating or dynamic version ranges.
 3. **Local Vulnerability Audits**:
    - Frontend: `npm audit` (verified: 0 vulnerabilities).
    - Backend: Periodic Maven dependency analysis and OWASP Dependency-Check.

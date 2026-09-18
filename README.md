@@ -154,14 +154,14 @@ graph TB
 
 ## Tech Stack
 
-**Backend** (`pom.xml`, Spring Boot parent `3.5.0`):
+**Backend** (`pom.xml`, Spring Boot parent `3.5.16`):
 
 | Component | Technology |
 |---|---|
 | Language / runtime | Java 25 |
-| Framework | Spring Boot 3.5.0 (`spring-boot-starter-web`, `spring-boot-starter-validation`) |
+| Framework | Spring Boot 3.5.16 (`spring-boot-starter-web`, `spring-boot-starter-validation`) |
 | Security | Spring Security (`spring-boot-starter-security`), stateless HTTP Basic, BCrypt password hashing |
-| Persistence | MyBatis (`mybatis-spring-boot-starter` 3.0.4), annotation-based mappers (no XML) |
+| Persistence | MyBatis (`mybatis-spring-boot-starter` 3.0.5), annotation-based mappers (no XML) |
 | Database driver | `mysql-connector-j` |
 | Schema migrations | Flyway (`flyway-core`, `flyway-mysql`) |
 | Boilerplate reduction | Lombok |
@@ -183,7 +183,7 @@ graph TB
 
 ```
 siteflow/
-├── pom.xml                              # Maven build, Spring Boot 3.5.0, Java 25
+├── pom.xml                              # Maven build, Spring Boot 3.5.16, Java 25
 ├── src/
 │   ├── main/java/com/siteflow/
 │   │   ├── SiteflowApplication.java     # Spring Boot entry point
@@ -575,12 +575,12 @@ Administrative users can inspect and filter audit history via a dedicated, read-
 SiteFlow maintains a minimal, audited, and strictly controlled software supply chain designed to mitigate third-party risk:
 
 1. **Dependency Inventory & Licensing**:
-   - **Backend**: Built on Spring Boot 3.5.0, MyBatis 3.0.4, Flyway 11.7.2, JJWT 0.12.6, and Lombok under permissive **Apache-2.0** and **MIT** licenses. MySQL Connector/J 9.2.0 is licensed under **GPL-2.0 with the Universal FOSS Exception** (suitable for network-executed SaaS; requires legal review prior to closed-source on-premise redistribution).
+   - **Backend**: Built on Spring Boot 3.5.16, MyBatis 3.0.5, Flyway 11.7.2, JJWT 0.12.7, and Lombok under permissive **Apache-2.0** and **MIT** licenses. MySQL Connector/J 9.7.0 is licensed under **GPL-2.0 with the Universal FOSS Exception** (suitable for network-executed SaaS; requires legal review prior to closed-source on-premise redistribution).
    - **Frontend**: Vue 3, Vue Router, Element Plus, Axios, Chart.js, vue-chartjs, and Vite under **MIT** licenses.
    - Complete inventory and notices: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 2. **Dependency Locking & Reproducibility**:
    - `frontend/package-lock.json` is committed and enforced.
-   - Maven dependencies are managed deterministically via `spring-boot-starter-parent:3.5.0` with no floating or unbounded version ranges.
+   - Maven dependencies are managed deterministically via `spring-boot-starter-parent:3.5.16` with no floating or unbounded version ranges.
 3. **Secrets Management Policy**:
    - Zero hardcoded passwords, tokens, or private keys in source or test configuration.
    - All credentials (`DB_PASSWORD`, `JWT_SECRET`) are injected via environment variables.

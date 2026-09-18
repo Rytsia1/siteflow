@@ -44,15 +44,15 @@ The system replaces manual paper logbooks and error-prone spreadsheets with:
 
 ### Backend
 - **Runtime**: Java 21 / 25+ (Target Release 25)
-- **Framework**: Spring Boot 3.5.0
+- **Framework**: Spring Boot 3.5.16
   - `spring-boot-starter-web` (REST controllers)
   - `spring-boot-starter-security` (Spring Security 6 with stateless filter chain)
   - `spring-boot-starter-validation` (Jakarta Bean Validation)
   - `spring-boot-starter-actuator` (Production health & observability probes)
-- **Persistence**: MyBatis 3.0.4 + MySQL Connector/J 8.0
+- **Persistence**: MyBatis 3.0.5 + MySQL Connector/J 9.7.0
 - **Connection Pool**: HikariCP (Max pool size: 20, connection timeout: 20s)
-- **Database Migrations**: Flyway Core (12 versioned migrations, V1 through V12)
-- **Security & Tokens**: `jjwt-api` / `jjwt-impl` / `jjwt-jackson` (0.12.6, HMAC-SHA256)
+- **Database Migrations**: Flyway Core (15 versioned migrations, V1 through V15)
+- **Security & Tokens**: `jjwt-api` / `jjwt-impl` / `jjwt-jackson` (0.12.7, HMAC-SHA256)
 - **Build Tool**: Apache Maven 3.9+
 
 ### Frontend
@@ -351,7 +351,7 @@ npm run dev
 ## 14. Software Supply Chain, Dependency & Asset Compliance
 
 ### A. Dependency Locking & Version Determinism
-- **Backend (`pom.xml`)**: All direct dependencies are either pinned to explicit releases (`0.12.6`, `3.0.4`) or curated by Spring Boot BOM `spring-boot-starter-parent:3.5.0`. No dynamic or unbounded version ranges are permitted.
+- **Backend (`pom.xml`)**: All direct dependencies are either pinned to explicit releases (`0.12.7`, `3.0.5`) or curated by Spring Boot BOM `spring-boot-starter-parent:3.5.16`. No dynamic or unbounded version ranges are permitted.
 - **Frontend (`package-lock.json`)**: Committed lockfile enforces reproducible installs via `npm ci` or `npm install`.
 
 ### B. Secrets & Credential Isolation
