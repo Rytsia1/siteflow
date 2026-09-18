@@ -1,12 +1,15 @@
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
 import { auth } from '../auth'
 
+const route = useRoute()
 const isAdmin = computed(() => auth.role === 'ADMIN' || auth.role === 'PROCUREMENT')
 const canApprove = computed(() => auth.role === 'ADMIN')
 const activeTab = ref('submit')
+const highlightedId = ref('')
 
 // ---- Tab 1: Submit Material Request ----
 const items = ref([])
@@ -201,7 +204,39 @@ function formatDate(value) {
   return value ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 }
 
+function checkDeepLink() {
+  if (route.query.tab) {
+    const validTabs = ['submit', 'pending', 'approved', 'pos']
+    if (validTabs.includes(route.query.tab)) {
+      activeTab.value = route.query.tab
+    }
+  }
+  const target = route.query.highlight || route.query.poNumber || route.query.requestId || route.query.id
+  if (target) {
+    highlightedId.value = String(target).trim().toLowerCase()
+    setTimeout(() => {
+      highlightedId.value = ''
+    }, 4500)
+  }
+}
+
+function isHighlighted(row) {
+  if (!highlightedId.value) return false
+  const h = highlightedId.value
+  if (row.id && String(row.id).toLowerCase() === h) return true
+  const digitsOnly = h.replace(/\D/g, '')
+  if (digitsOnly && row.id && String(row.id) === digitsOnly) return true
+  if (row.poNumber && String(row.poNumber).toLowerCase().includes(h)) return true
+  if (h.includes(String(row.id))) return true
+  return false
+}
+
+function getRowClass({ row }) {
+  return isHighlighted(row) ? 'sf-row-highlight' : ''
+}
+
 onMounted(async () => {
+  checkDeepLink()
   await loadItems()
   if (canApprove.value) {
     await loadPendingRequests()
@@ -210,6 +245,10 @@ onMounted(async () => {
     await loadApprovedRequests()
     await loadPurchaseOrders()
   }
+})
+
+watch(() => route.query, () => {
+  checkDeepLink()
 })
 </script>
 
@@ -342,7 +381,7 @@ onMounted(async () => {
         </div>
 
         <div class="accessible-table-container" tabindex="0" role="region" aria-label="Pending Material Requests Table">
-          <el-table v-loading="loadingPending" :data="pendingRequests" stripe border>
+          <el-table v-loading="loadingPending" :data="pendingRequests" :row-class-name="getRowClass" stripe border>
             <el-table-column prop="id" label="MR ID" width="100">
               <template #default="{ row }">
                 <span class="code-id">MR-#{{ row.id }}</span>
@@ -407,7 +446,7 @@ onMounted(async () => {
         </div>
 
         <div class="accessible-table-container" tabindex="0" role="region" aria-label="Approved Material Requests Table">
-          <el-table v-loading="loadingApproved" :data="approvedRequests" stripe border>
+          <el-table v-loading="loadingApproved" :data="approvedRequests" :row-class-name="getRowClass" stripe border>
             <el-table-column prop="id" label="MR ID" width="100">
               <template #default="{ row }">
                 <span class="code-id">MR-#{{ row.id }}</span>
@@ -461,7 +500,7 @@ onMounted(async () => {
         </div>
 
         <div class="accessible-table-container" tabindex="0" role="region" aria-label="Purchase Orders Table">
-          <el-table v-loading="loadingPos" :data="purchaseOrders" stripe border>
+          <el-table v-loading="loadingPos" :data="purchaseOrders" :row-class-name="getRowClass" stripe border>
             <el-table-column prop="poNumber" label="PO Number" width="160">
               <template #default="{ row }">
                 <span class="code-id">{{ row.poNumber }}</span>

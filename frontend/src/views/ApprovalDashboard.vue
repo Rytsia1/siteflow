@@ -1,9 +1,12 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
 
+const route = useRoute()
 const activeTab = ref('borrow')
+const highlightedId = ref('')
 
 // ---- Tab 1: Borrow Requests ----
 const requests = ref([])
@@ -137,13 +140,47 @@ async function submitRejectMr() {
   }
 }
 
+function checkDeepLink() {
+  if (route.query.tab === 'material' || route.query.tab === 'borrow') {
+    activeTab.value = route.query.tab
+  }
+  const target = route.query.highlight || route.query.request || route.query.requestId || route.query.id
+  if (target) {
+    highlightedId.value = String(target).trim().toLowerCase()
+    setTimeout(() => {
+      highlightedId.value = ''
+    }, 4500)
+  }
+}
+
+function isHighlighted(row) {
+  if (!highlightedId.value) return false
+  const h = highlightedId.value
+  const idStr = String(row.id).toLowerCase()
+  if (idStr === h) return true
+  // Match digits, e.g. "MR-2026-014" or "MR-#14" vs "14" or full reference match
+  const digitsOnly = h.replace(/\D/g, '')
+  if (digitsOnly && digitsOnly === idStr) return true
+  if (h.includes(idStr)) return true
+  return false
+}
+
+function getRowClass({ row }) {
+  return isHighlighted(row) ? 'sf-row-highlight' : ''
+}
+
 function formatDate(value) {
   return value ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 }
 
 onMounted(() => {
+  checkDeepLink()
   loadPending()
   loadPendingMr()
+})
+
+watch(() => route.query, () => {
+  checkDeepLink()
 })
 </script>
 
@@ -183,7 +220,12 @@ onMounted(() => {
 
         <!-- Decision Cards Grid (Design Layout) -->
         <div v-if="requests.length > 0" class="sf-queue-grid">
-          <div v-for="row in requests" :key="row.id" class="sf-approval-card">
+          <div
+            v-for="row in requests"
+            :key="row.id"
+            class="sf-approval-card"
+            :class="{ 'sf-card-highlight': isHighlighted(row) }"
+          >
             <div class="card-header">
               <span class="card-ref-id">BR-#{{ row.id }}</span>
               <span class="status-badge warning">BORROW REQUEST</span>
@@ -235,7 +277,7 @@ onMounted(() => {
 
         <!-- Accessible Table for Keyboard & Bulk Inspection -->
         <div class="accessible-table-container" style="margin-top: 24px" tabindex="0" role="region" aria-label="Pending Borrow Requests Table">
-          <el-table v-loading="loading" :data="requests" stripe border>
+          <el-table v-loading="loading" :data="requests" :row-class-name="getRowClass" stripe border>
             <el-table-column prop="id" label="ID" width="100">
               <template #default="{ row }">
                 <span class="code-id">BR-#{{ row.id }}</span>
@@ -326,7 +368,12 @@ onMounted(() => {
 
         <!-- Material Request Decision Cards -->
         <div v-if="materialRequests.length > 0" class="sf-queue-grid">
-          <div v-for="row in materialRequests" :key="row.id" class="sf-approval-card">
+          <div
+            v-for="row in materialRequests"
+            :key="row.id"
+            class="sf-approval-card"
+            :class="{ 'sf-card-highlight': isHighlighted(row) }"
+          >
             <div class="card-header">
               <span class="card-ref-id">MR-#{{ row.id }}</span>
               <span class="status-badge warning">MATERIAL REQUEST</span>
@@ -378,7 +425,7 @@ onMounted(() => {
 
         <!-- Accessible Table -->
         <div class="accessible-table-container" style="margin-top: 24px" tabindex="0" role="region" aria-label="Pending Material Requests Table">
-          <el-table v-loading="loadingMr" :data="materialRequests" stripe border>
+          <el-table v-loading="loadingMr" :data="materialRequests" :row-class-name="getRowClass" stripe border>
             <el-table-column prop="id" label="MR ID" width="100">
               <template #default="{ row }">
                 <span class="code-id">MR-#{{ row.id }}</span>

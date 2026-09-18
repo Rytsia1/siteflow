@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { auth, logout, isAuthenticated } from './auth'
 import http from './api/http'
+import { resolveNotificationTarget } from './api/accessibility-utils'
 
 const router = useRouter()
 const route = useRoute()
@@ -73,52 +75,133 @@ async function fetchPendingCount() {
 
 // Notification Center State
 const notificationVisible = ref(false)
+const notificationLoading = ref(false)
+const notificationError = ref('')
+const navError = ref('')
+const readNotificationIds = ref(new Set())
+
 const notifications = ref([
   {
     id: 1,
-    title: 'Tool Return Inspection Pending',
-    detail: 'Impact Drill returned with condition: Needs Repair',
-    timestamp: '15m ago',
-    refId: 'TL-00482',
-    route: '/assets',
-    roles: ['ADMIN', 'WAREHOUSE_STAFF'],
-    tone: '#E0B152',
+    type: 'MATERIAL_REQUEST_APPROVAL',
+    referenceType: 'MATERIAL_REQUEST',
+    referenceId: 'MR-2026-014',
+    title: 'Material Request requires approval',
+    message: 'Electrical conduit & reinforcement bars',
+    detail: 'Electrical conduit & reinforcement bars',
+    read: false,
     unread: true,
+    createdAt: '12 minutes ago',
+    timestamp: '12m ago',
+    roles: ['ADMIN'],
+    tone: '#4E88C4',
   },
   {
     id: 2,
-    title: 'Borrow Request #3 Approved',
-    detail: 'Your request for Angle Grinder has been approved',
-    timestamp: '1h ago',
-    refId: 'BR-0306',
-    route: '/borrow',
-    roles: ['FIELD_STAFF'],
-    tone: '#5FC08A',
+    type: 'BORROW_REQUEST_ACTION',
+    referenceType: 'BORROW_REQUEST',
+    referenceId: 'BR-2026-008',
+    title: 'Borrow Request requires action',
+    message: 'Heavy Angle Grinder & Safety Gear awaiting checkout',
+    detail: 'Heavy Angle Grinder & Safety Gear awaiting checkout',
+    read: false,
     unread: true,
+    createdAt: '35 minutes ago',
+    timestamp: '35m ago',
+    roles: ['ADMIN', 'FIELD_STAFF'],
+    tone: '#5FC08A',
   },
   {
     id: 3,
-    title: 'Low Stock Threshold Warning',
-    detail: 'Safety Gloves stock fell below minimum threshold (10 units)',
+    type: 'LOW_STOCK',
+    referenceType: 'ITEM',
+    referenceId: 'MT-1042',
+    title: 'Low stock: Safety Gloves',
+    message: 'Stock fell below minimum threshold (10 units)',
+    detail: 'Stock fell below minimum threshold (10 units)',
+    read: false,
+    unread: true,
+    createdAt: '2 hours ago',
     timestamp: '2h ago',
-    refId: 'MT-1042',
-    route: '/inventory',
     roles: ['ADMIN', 'WAREHOUSE_STAFF'],
     tone: '#E8756A',
-    unread: true,
   },
   {
     id: 4,
-    title: 'Material Request #1 Ready for PO',
-    detail: 'Foundation reinforcement material approved',
-    timestamp: '3h ago',
-    refId: 'MR-2026-0140',
-    route: '/procurement',
+    type: 'MATERIAL_REQUEST_REJECTED',
+    referenceType: 'MATERIAL_REQUEST',
+    referenceId: 'MR-2026-018',
+    title: 'Material Request was rejected',
+    message: 'Subfloor conduit rejected by site supervisor',
+    detail: 'Subfloor conduit rejected by site supervisor',
+    read: false,
+    unread: true,
+    createdAt: '4 hours ago',
+    timestamp: '4h ago',
+    roles: ['ADMIN', 'PROCUREMENT', 'FIELD_STAFF'],
+    tone: '#E8756A',
+  },
+  {
+    id: 5,
+    type: 'ASSET_OVERDUE',
+    referenceType: 'ASSET',
+    referenceId: 'AST-0042',
+    title: 'Asset AST-0042 is overdue',
+    message: 'Heavy Rotary Hammer return overdue from Zone B',
+    detail: 'Heavy Rotary Hammer return overdue from Zone B',
+    read: false,
+    unread: true,
+    createdAt: '6 hours ago',
+    timestamp: '6h ago',
+    roles: ['ADMIN', 'WAREHOUSE_STAFF', 'FIELD_STAFF'],
+    tone: '#E0B152',
+  },
+  {
+    id: 6,
+    type: 'PURCHASE_ORDER_RECEIVED',
+    referenceType: 'PURCHASE_ORDER',
+    referenceId: 'PO-2026-021',
+    title: 'Purchase Order has been received',
+    message: 'Structural steel delivery arrived at Central Warehouse',
+    detail: 'Structural steel delivery arrived at Central Warehouse',
+    read: true,
+    unread: false,
+    createdAt: '1 day ago',
+    timestamp: '1d ago',
     roles: ['ADMIN', 'PROCUREMENT'],
     tone: '#8FB6DD',
-    unread: false,
   },
 ])
+
+function loadReadState() {
+  try {
+    const stored = sessionStorage.getItem('siteflow.notifications.read')
+    if (stored) {
+      const ids = JSON.parse(stored)
+      if (Array.isArray(ids)) {
+        readNotificationIds.value = new Set(ids)
+      }
+    }
+  } catch {
+    // quiet fallback
+  }
+}
+
+function saveReadState() {
+  try {
+    sessionStorage.setItem(
+      'siteflow.notifications.read',
+      JSON.stringify(Array.from(readNotificationIds.value))
+    )
+  } catch {
+    // quiet fallback
+  }
+}
+
+function isRead(item) {
+  if (readNotificationIds.value.has(item.id)) return true
+  return item.read === true || item.unread === false
+}
 
 const userNotifications = computed(() => {
   return notifications.value.filter(
@@ -127,20 +210,41 @@ const userNotifications = computed(() => {
 })
 
 const unreadCount = computed(() => {
-  return userNotifications.value.filter((n) => n.unread).length
+  return userNotifications.value.filter((n) => !isRead(n)).length
 })
 
-function markAllAsRead() {
-  notifications.value.forEach((n) => {
-    n.unread = false
-  })
+function markAsRead(id) {
+  readNotificationIds.value.add(id)
+  const item = notifications.value.find((n) => n.id === id)
+  if (item) {
+    item.read = true
+    item.unread = false
+  }
+  saveReadState()
 }
 
-function handleNotificationClick(item) {
-  item.unread = false
+function markAllAsRead() {
+  userNotifications.value.forEach((n) => {
+    readNotificationIds.value.add(n.id)
+    n.read = true
+    n.unread = false
+  })
+  saveReadState()
+}
+
+async function handleNotificationClick(item) {
+  markAsRead(item.id)
   notificationVisible.value = false
-  if (item.route) {
-    router.push(item.route)
+  navError.value = ''
+
+  try {
+    const target = resolveNotificationTarget(item, auth.role)
+    if (target) {
+      await router.push(target)
+    }
+  } catch (err) {
+    navError.value = `Navigation failed: ${err?.message || 'Route not found'}`
+    ElMessage.error('Unable to navigate to the referenced record.')
   }
 }
 
@@ -157,6 +261,7 @@ const userInitials = computed(() => {
 
 onMounted(() => {
   initTheme()
+  loadReadState()
   if (isAuthenticated()) {
     fetchPendingCount()
   }
@@ -351,15 +456,30 @@ watch(
                 </button>
               </div>
 
-              <div v-if="userNotifications.length > 0" class="sf-notif-list" role="list">
+              <!-- Loading State -->
+              <div v-if="notificationLoading" class="sf-notif-loading" aria-live="polite">
+                <div class="sf-notif-spinner"></div>
+                <span>Checking notifications...</span>
+              </div>
+
+              <!-- Error State -->
+              <div v-else-if="notificationError" class="sf-notif-error" role="alert">
+                <span>{{ notificationError }}</span>
+                <button type="button" class="sf-notif-retry-btn" @click="notificationError = ''">
+                  Dismiss
+                </button>
+              </div>
+
+              <!-- Notification Items List -->
+              <div v-else-if="userNotifications.length > 0" class="sf-notif-list" role="list">
                 <button
                   v-for="item in userNotifications"
                   :key="item.id"
                   type="button"
                   class="sf-notif-item"
-                  :class="{ unread: item.unread }"
+                  :class="{ unread: !isRead(item) }"
                   role="listitem"
-                  :aria-label="`${item.title}, ${item.detail}, ${item.timestamp} ${item.unread ? '(Unread)' : '(Read)'}`"
+                  :aria-label="`${item.title}, ${item.message || item.detail}, ${item.createdAt || item.timestamp} ${!isRead(item) ? '(Unread)' : '(Read)'}`"
                   @click="handleNotificationClick(item)"
                 >
                   <div class="sf-notif-item-top">
@@ -367,11 +487,15 @@ watch(
                     <span class="sf-notif-item-title">{{ item.title }}</span>
                   </div>
                   <div class="sf-notif-item-body">
-                    <span class="sf-notif-ref">{{ item.refId }}</span> · {{ item.detail }}
+                    <span v-if="item.referenceId || item.refId" class="sf-notif-ref">{{ item.referenceId || item.refId }}</span>
+                    <span v-if="item.referenceId || item.refId"> · </span>
+                    <span>{{ item.message || item.detail }}</span>
                   </div>
-                  <div class="sf-notif-item-time">{{ item.timestamp }}</div>
+                  <div class="sf-notif-item-time">{{ item.createdAt || item.timestamp }}</div>
                 </button>
               </div>
+
+              <!-- Empty State -->
               <div v-else class="sf-notif-empty">
                 <p>Nothing needs attention right now.</p>
               </div>
@@ -845,16 +969,74 @@ watch(
   border-bottom: 1px solid var(--siteflow-border-color, #1c2739);
   padding: 10px 14px;
   cursor: pointer;
-  transition: background-color 0.12s ease;
+  transition: all 0.15s ease;
   width: 100%;
 }
 
 .sf-notif-item:hover {
-  background-color: #16203a;
+  background-color: rgba(78, 136, 196, 0.12);
+  transform: translateX(2px);
+}
+
+.sf-notif-item:focus-visible {
+  outline: 2px solid var(--siteflow-focus-ring-color, #4e88c4);
+  outline-offset: -2px;
 }
 
 .sf-notif-item.unread {
-  background-color: #121c2f;
+  background-color: rgba(18, 28, 47, 0.85);
+  border-left: 3px solid #4e88c4;
+}
+
+.sf-notif-item:not(.unread) {
+  opacity: 0.82;
+  border-left: 3px solid transparent;
+}
+
+.sf-notif-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 14px;
+  color: #8fb6dd;
+  font-size: 12.5px;
+}
+
+.sf-notif-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(143, 182, 221, 0.2);
+  border-top-color: #8fb6dd;
+  border-radius: 50%;
+  animation: sf-spin 0.8s linear infinite;
+}
+
+@keyframes sf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sf-notif-error {
+  padding: 16px 14px;
+  text-align: center;
+  color: #e8756a;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.sf-notif-retry-btn {
+  border: 1px solid #e8756a;
+  background: transparent;
+  color: #e8756a;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  border-radius: 3px;
+  cursor: pointer;
 }
 
 .sf-notif-item-top {

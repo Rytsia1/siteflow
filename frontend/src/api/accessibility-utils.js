@@ -134,6 +134,104 @@ export function resolveNotificationRoute(notificationType) {
 }
 
 /**
+ * Resolves a full deep-linking destination (path + query parameters) for a notification.
+ * Enables direct contextual navigation (Notification -> Relevant record -> Action).
+ *
+ * @param {object} notification
+ * @param {string} [notification.type]
+ * @param {string} [notification.referenceType] - 'MATERIAL_REQUEST' | 'BORROW_REQUEST' | 'ITEM' | 'ASSET' | 'PURCHASE_ORDER'
+ * @param {string|number} [notification.referenceId] - e.g. 'MR-2026-014', 'MT-1042', 'TL-00482'
+ * @param {string} [userRole] - 'ADMIN' | 'WAREHOUSE_STAFF' | 'FIELD_STAFF' | 'PROCUREMENT'
+ * @returns {{ path: string, query?: Record<string, string> }}
+ */
+export function resolveNotificationTarget(notification, userRole = '') {
+  if (!notification) return { path: '/' }
+
+  const type = String(notification.type || '').toUpperCase()
+  const refType = String(notification.referenceType || '').toUpperCase()
+  const refId = notification.referenceId != null ? String(notification.referenceId) : ''
+  const role = String(userRole || '').toUpperCase()
+
+  // 1. Material Requests & Requisitions
+  if (refType === 'MATERIAL_REQUEST' || type.includes('MATERIAL')) {
+    if (type.includes('APPROVAL') && role === 'ADMIN') {
+      return {
+        path: '/approvals',
+        query: { tab: 'material', ...(refId ? { highlight: refId } : {}) },
+      }
+    }
+    if (type.includes('READY_PO') || type.includes('APPROVED')) {
+      return {
+        path: '/procurement',
+        query: { tab: 'approved', ...(refId ? { highlight: refId } : {}) },
+      }
+    }
+    return {
+      path: '/procurement',
+      query: { tab: 'pending', ...(refId ? { highlight: refId } : {}) },
+    }
+  }
+
+  // 2. Borrow Requests & Equipment Custody
+  if (refType === 'BORROW_REQUEST' || type.includes('BORROW')) {
+    if ((type.includes('APPROVAL') || type.includes('ACTION')) && role === 'ADMIN') {
+      return {
+        path: '/approvals',
+        query: { tab: 'borrow', ...(refId ? { highlight: refId } : {}) },
+      }
+    }
+    if (type.includes('OVERDUE') || type.includes('RETURN') || type.includes('ACTION')) {
+      return {
+        path: '/borrow',
+        query: { tab: 'return', ...(refId ? { requestId: refId } : {}) },
+      }
+    }
+    return {
+      path: '/borrow',
+      query: { tab: 'new', ...(refId ? { highlight: refId } : {}) },
+    }
+  }
+
+  // 3. Inventory Items & Stock Alerts
+  if (refType === 'ITEM' || type.includes('STOCK') || type.includes('INVENTORY')) {
+    return {
+      path: '/inventory',
+      query: { ...(refId ? { itemCode: refId, highlight: refId } : {}) },
+    }
+  }
+
+  // 4. Physical Tool Instances & Scanner Operations
+  if (refType === 'ASSET' || type.includes('ASSET') || type.includes('SCAN')) {
+    if (role === 'ADMIN' || role === 'WAREHOUSE_STAFF' || !role) {
+      return {
+        path: '/assets',
+        query: {
+          mode: type.includes('RETURN') || type.includes('OVERDUE') ? 'return' : 'checkout',
+          ...(refId ? { code: refId, highlight: refId } : {}),
+        },
+      }
+    }
+    // Non-warehouse roles (FIELD_STAFF) process returns/checkouts via Borrow view
+    return {
+      path: '/borrow',
+      query: { tab: 'return', ...(refId ? { requestId: refId } : {}) },
+    }
+  }
+
+  // 5. Purchase Orders
+  if (refType === 'PURCHASE_ORDER' || type.includes('PO') || type.includes('PURCHASE')) {
+    return {
+      path: '/procurement',
+      query: { tab: 'pos', ...(refId ? { poNumber: refId, highlight: refId } : {}) },
+    }
+  }
+
+  // Fallback to base route resolver
+  const basePath = resolveNotificationRoute(notification.type)
+  return { path: basePath, query: refId ? { highlight: refId } : {} }
+}
+
+/**
  * Generates an accurate, accessible empty state message distinguishing between
  * empty data, active filters, and loading/error states.
  * @param {object} params

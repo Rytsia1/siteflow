@@ -1,13 +1,16 @@
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
 import { auth } from '../auth'
 
+const route = useRoute()
 const items = ref([])
 const loading = ref(false)
 const searchText = ref('')
 const categoryFilter = ref('')
+const highlightedCode = ref('')
 
 const canAdjustStock = computed(() => auth.role === 'ADMIN' || auth.role === 'WAREHOUSE_STAFF')
 const locations = ref([])
@@ -60,10 +63,45 @@ const lowStockCount = computed(() => items.value.filter((i) => i.totalQty <= i.m
 const toolCount = computed(() => items.value.filter((i) => i.category === 'TOOL' || i.category === 'LIFTING_GEAR').length)
 const healthyCount = computed(() => items.value.filter((i) => i.totalQty > i.minStockThreshold).length)
 
+function checkDeepLink() {
+  const target = route.query.itemCode || route.query.highlight || route.query.q
+  if (target) {
+    const code = String(target).trim()
+    searchText.value = code
+    highlightedCode.value = code.toLowerCase()
+
+    if (route.query.action === 'adjust' && canAdjustStock.value && items.value.length) {
+      const found = items.value.find(
+        (i) => i.itemCode.toLowerCase() === code.toLowerCase() || String(i.id) === code
+      )
+      if (found) {
+        openAdjustmentDialog(found)
+      }
+    }
+
+    setTimeout(() => {
+      highlightedCode.value = ''
+    }, 4500)
+  }
+}
+
+function isRowHighlighted(row) {
+  if (!highlightedCode.value) return false
+  return (
+    row.itemCode.toLowerCase().includes(highlightedCode.value) ||
+    String(row.id) === highlightedCode.value
+  )
+}
+
+function getRowClass({ row }) {
+  return isRowHighlighted(row) ? 'sf-row-highlight' : ''
+}
+
 async function loadItems() {
   loading.value = true
   try {
     items.value = await http.get('/items')
+    checkDeepLink()
   } finally {
     loading.value = false
   }
@@ -120,6 +158,8 @@ onMounted(() => {
     loadLocations()
   }
 })
+
+watch(() => route.query, () => checkDeepLink())
 </script>
 
 <template>

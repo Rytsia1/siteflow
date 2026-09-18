@@ -1,9 +1,12 @@
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
 
+const route = useRoute()
 const mode = ref('checkout')
+const highlightedCard = ref(false)
 const scanValue = ref('')
 const scanInputRef = ref()
 const borrowRequestId = ref(null)
@@ -97,7 +100,34 @@ async function processReturn(code) {
   }
 }
 
-onMounted(focusScanInput)
+function checkDeepLink() {
+  if (route.query.mode === 'return' || route.query.mode === 'checkout') {
+    mode.value = route.query.mode
+  }
+  const code = route.query.code || route.query.highlight || route.query.serialNumber || route.query.tag
+  if (code) {
+    scanValue.value = String(code)
+    highlightedCard.value = true
+    setTimeout(() => {
+      highlightedCard.value = false
+    }, 4500)
+  }
+  if (route.query.borrowRequestId) {
+    const brId = Number(route.query.borrowRequestId)
+    if (!isNaN(brId) && brId > 0) {
+      borrowRequestId.value = brId
+    }
+  }
+  focusScanInput()
+}
+
+onMounted(() => {
+  checkDeepLink()
+})
+
+watch(() => route.query, () => {
+  checkDeepLink()
+})
 </script>
 
 <template>
@@ -124,7 +154,7 @@ onMounted(focusScanInput)
       </div>
 
       <!-- Scanner Controls Card -->
-      <div class="scanner-card">
+      <div class="scanner-card" :class="{ 'sf-card-highlight': highlightedCard }">
         <span class="sf-corner-mark top-left">+</span>
         <span class="sf-corner-mark top-right">+</span>
         <span class="sf-corner-mark bottom-left">+</span>

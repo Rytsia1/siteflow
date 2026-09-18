@@ -1,9 +1,12 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
 
+const route = useRoute()
 const activeTab = ref('new')
+const highlightedCard = ref(false)
 
 // ---- Tab 1: New Borrow Request ----
 const formRef = ref()
@@ -30,7 +33,38 @@ async function loadOptions() {
   locations.value = locationList
 }
 
-onMounted(loadOptions)
+function checkDeepLink() {
+  if (route.query.tab === 'return' || route.query.tab === 'new') {
+    activeTab.value = route.query.tab
+  }
+  const reqTarget = route.query.requestId || route.query.request || route.query.highlight
+  if (reqTarget) {
+    const digits = String(reqTarget).replace(/\D/g, '')
+    const num = digits ? Number(digits) : Number(reqTarget)
+    if (!isNaN(num) && num > 0) {
+      returnForm.requestId = num
+    }
+    highlightedCard.value = true
+    setTimeout(() => {
+      highlightedCard.value = false
+    }, 4500)
+  }
+  if (route.query.itemId) {
+    const itemIdNum = Number(route.query.itemId)
+    if (!isNaN(itemIdNum) && form.lines.length > 0) {
+      form.lines[0].itemId = itemIdNum
+    }
+  }
+}
+
+onMounted(() => {
+  loadOptions()
+  checkDeepLink()
+})
+
+watch(() => route.query, () => {
+  checkDeepLink()
+})
 
 function addLine() {
   form.lines.push({ itemId: null, qty: 1 })
@@ -260,7 +294,7 @@ async function handleReturnSubmit() {
       <!-- Tab 2: Process Return -->
       <el-tab-pane label="Process Return" name="return">
         <div class="sf-card-container">
-          <div class="sf-form-card">
+          <div class="sf-form-card" :class="{ 'sf-card-highlight': highlightedCard && activeTab === 'return' }">
             <span class="sf-corner-mark top-left">+</span>
             <span class="sf-corner-mark top-right">+</span>
             <span class="sf-corner-mark bottom-left">+</span>
