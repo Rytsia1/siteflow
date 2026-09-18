@@ -392,13 +392,42 @@ Instead, SiteFlow implements an **Anonymize & Deactivate** model:
 - Detailed documentation maintained in [`PRIVACY.md`](PRIVACY.md) and [`TERMS.md`](TERMS.md).
 - Placeholders requiring organizational confirmation (legal entity name, data governance contact) are clearly documented.
 
+## Accessibility & UX Compliance (WCAG 2.1 AA)
+
+SiteFlow is designed for high accessibility, visual consistency, and keyboard navigation across industrial job-site and warehouse environments:
+
+1. **Semantic Structure & Bypass Navigation**:
+   - Layout strictly utilizes HTML5 landmark elements: `<header role="banner">`, `<nav aria-label="Main Navigation">`, `<main id="main-content" role="main" tabindex="-1">`, and `<footer role="contentinfo">`.
+   - Includes `<a href="#main-content" class="skip-link">Skip to main content</a>` as the first tab stop, allowing keyboard users to bypass navigation.
+   - Distinct heading hierarchy (`<h1>` page titles, `<h2>` card and section headers, `<h3>` metric headings).
+2. **Keyboard Operability & Visible Focus Indicators**:
+   - Every interactive control (buttons, links, inputs, selects, pagination, table row actions) features a 2px high-contrast `:focus-visible` ring with 2px offset.
+   - Wide data tables are wrapped in `.accessible-table-container` with `tabindex="0"` and `role="region"` for keyboard-driven horizontal panning.
+   - Modals and dialogs are accessible with `aria-modal="true"` and close upon `Escape`.
+3. **Color Contrast & Dark Mode**:
+   - Light and dark themes are calibrated to achieve $\ge 4.5:1$ contrast ratio for standard text and $\ge 3:1$ for large text against their respective backgrounds.
+   - Dark theme is powered by Element Plus CSS variables (`dark/css-vars.css`) and toggled via the navigation header with `localStorage` persistence.
+4. **Non-Color Status Communication**:
+   - Equipment and request statuses never rely on color alone:
+     - `Approved`: `✓ Approved`
+     - `Rejected`: `✕ Rejected`
+     - `Pending`: `⏳ Pending Approval`
+     - `Low Stock`: `⚠️ X (Low Stock)` vs `✓ X` (Normal)
+     - `Tool Conditions`: `✓ Good Condition`, `⚠️ Needs Repair`, `✕ Broken`
+5. **In-App Notification Center**:
+   - Actionable notification menu with unread badge counter, keyboard activation, and target resource navigation (`/borrow`, `/procurement`, `/assets`, `/inventory`) without bypassing backend authorization.
+6. **Accessible Visualizations**:
+   - Chart.js consumption outflow charts in `AnalyticsDashboard.vue` are accompanied by a `.sr-only` semantic table (`<caption>`, `<th>`, `<td>`), ensuring screen-reader accessibility.
+   - Tool utilization progress bars provide explicit textual percentages (`${tool.currentlyOut} of ${tool.totalOwned} deployed (${utilizationPercent(tool)}%)`).
+7. **Automated Accessibility Testing**:
+   - Automated regression test suite (`frontend/src/api/accessibility.test.js`) verifies WCAG AA contrast calculations, non-color status mappings, notification route resolution, empty states, and CSS focus ring rules.
+
 ## Roadmap (planned — not implemented)
 
 The following are explicitly **not** implemented yet and are listed here so they aren't mistaken for existing functionality:
 
 - **Material request completion endpoint.** `ProcurementService.markMaterialRequestCompleted()` (PO_CREATED → COMPLETED) exists at the service layer but is not wired to any controller endpoint. (Approval/rejection, SUBMITTED → APPROVED/REJECTED, is implemented and exposed.)
 - **A dedicated `PROCUREMENT` role.** Referenced in `@PreAuthorize` annotations but not yet seeded or assignable through any UI/API.
-- **Automated frontend testing** (e.g. Vitest for unit tests, Playwright/Cypress for E2E).
 - **CI pipeline** (no GitHub Actions workflow currently exists in this repository).
 - **Multi-tenant / multi-project support** — the schema currently models a single organization's locations and inventory.
 - **Screenshots / demo media** for this README.

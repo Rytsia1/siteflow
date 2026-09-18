@@ -120,7 +120,7 @@
 <style scoped>
 .legal-container {
   min-height: 100vh;
-  background-color: #f5f7fa;
+  background-color: var(--el-bg-color-page, #f5f7fa);
   padding: 40px 20px;
   display: flex;
   justify-content: center;
@@ -129,43 +129,45 @@
 }
 
 .legal-card {
-  background: #ffffff;
+  background: var(--el-bg-color, #ffffff);
   max-width: 860px;
   width: 100%;
   border-radius: 8px;
+  border: 1px solid var(--el-border-color-light, #e4e7ed);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   padding: 40px;
   box-sizing: border-box;
 }
 
 .legal-header {
-  border-bottom: 1px solid #e4e7ed;
+  border-bottom: 1px solid var(--el-border-color-light, #e4e7ed);
   padding-bottom: 24px;
   margin-bottom: 28px;
 }
 
 .back-link {
   display: inline-block;
-  color: #409eff;
-  text-decoration: none;
+  color: var(--el-color-primary, #2b73c4);
+  text-decoration: underline;
   font-size: 14px;
   margin-bottom: 16px;
 }
 
-.back-link:hover {
-  text-decoration: underline;
+.back-link:hover,
+.back-link:focus-visible {
+  color: #1a4f8b;
 }
 
 h1 {
   font-size: 28px;
   font-weight: 700;
-  color: #1f2f3d;
+  color: var(--el-text-color-primary, #1f2f3d);
   margin: 0 0 8px 0;
 }
 
 .subtitle {
   font-size: 13px;
-  color: #909399;
+  color: var(--el-text-color-secondary, #595959);
   margin: 0;
 }
 
@@ -176,16 +178,16 @@ h1 {
 h2 {
   font-size: 18px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary, #303133);
   margin-bottom: 12px;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
   padding-bottom: 6px;
 }
 
 p {
   font-size: 14px;
   line-height: 1.7;
-  color: #606266;
+  color: var(--el-text-color-regular, #4a5568);
   margin: 0 0 12px 0;
 }
 
@@ -197,49 +199,50 @@ ul {
 li {
   font-size: 14px;
   line-height: 1.7;
-  color: #606266;
+  color: var(--el-text-color-regular, #4a5568);
   margin-bottom: 6px;
 }
 
 code {
-  background: #f0f2f5;
+  background: var(--el-fill-color-light, #f0f2f5);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 13px;
-  color: #e65d6e;
+  color: #c02d42;
   font-family: monospace;
 }
 
 .notice-box {
-  background: #fdf6ec;
-  border-left: 4px solid #e6a23c;
+  background: var(--el-color-warning-light-9, #fdf6ec);
+  border-left: 4px solid var(--el-color-warning, #e6a23c);
   padding: 12px 16px;
   border-radius: 0 4px 4px 0;
   font-size: 13px;
-  color: #7d5a29;
+  color: var(--el-text-color-primary, #7d5a29);
   line-height: 1.6;
   margin: 16px 0;
 }
 
 .legal-footer {
-  border-top: 1px solid #e4e7ed;
+  border-top: 1px solid var(--el-border-color-light, #e4e7ed);
   padding-top: 24px;
   text-align: center;
   font-size: 14px;
-  color: #909399;
+  color: var(--el-text-color-secondary, #595959);
 }
 
 .legal-nav-link {
-  color: #409eff;
-  text-decoration: none;
+  color: var(--el-color-primary, #2b73c4);
+  text-decoration: underline;
 }
 
-.legal-nav-link:hover {
-  text-decoration: underline;
+.legal-nav-link:hover,
+.legal-nav-link:focus-visible {
+  color: #1a4f8b;
 }
 
 .divider {
   margin: 0 12px;
-  color: #dcdfe6;
+  color: var(--el-border-color, #dcdfe6);
 }
 </style>

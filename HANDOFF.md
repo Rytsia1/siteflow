@@ -264,7 +264,7 @@ npm run dev
   ```bash
   mvn test
   ```
-- **Frontend**: **14 automated tests** covering HTTP client error interception, idempotency guards, and token injection:
+- **Frontend**: **22 automated tests** covering HTTP client error interception, idempotency guards, token injection, WCAG AA contrast verification, non-color statuses, notification routes, and CSS focus rules:
   ```bash
   cd frontend
   npm test
@@ -286,7 +286,7 @@ npm run dev
 
 ### C. Cookie & Storage Architecture
 - **Cookies**: 0 cookies used.
-- **LocalStorage**: None.
+- **LocalStorage**: Limited exclusively to user interface theme preference (`theme: 'dark' | 'light'`).
 - **SessionStorage**: `siteflow.auth` stores `{ username, token, role }` solely for the active tab session; purged on logout.
 - **Third-Party Trackers**: Zero tracking, analytics, or external telemetry libraries. Locally bundled UI assets.
 
@@ -306,12 +306,50 @@ npm run dev
 
 ---
 
-## 13. Operational Gotchas & Future Roadmap
+## 13. Accessibility & UX Compliance (WCAG 2.1 AA)
+
+### A. Semantic HTML Landmarks & Skip Links
+- **Landmarks**: Layout strictly structured with `<header role="banner">`, `<nav aria-label="Main Navigation">`, `<main id="main-content" role="main" tabindex="-1">`, and `<footer role="contentinfo">`.
+- **Skip Link**: `<a href="#main-content" class="skip-link">Skip to main content</a>` positioned as the first focusable element, bypassing navigation on `Tab`.
+- **Heading Hierarchy**: Distinct `<h1>` per view, followed by semantic `<h2>` section headings and `<h3 class="stat-card-title">` labels.
+
+### B. Visible Focus States & Keyboard Operability
+- **Focus Rings**: Universal `:focus-visible` ring across all interactive controls (`outline: 2px solid var(--el-color-primary); outline-offset: 2px`).
+- **Modal Dialogs**: All Element Plus dialogs configured with `aria-modal="true"`, accessible headings, and Escape key dismissal.
+- **Data Tables**: Wide tables wrapped in `.accessible-table-container` with `tabindex="0"`, `role="region"`, and descriptive `aria-label` for smooth keyboard scrollability.
+
+### C. Color Contrast & Multi-Modal Status Communication
+- **Contrast Ratios**: Default muted grays (`#909399`) elevated to high-contrast tokens (`#595959` / `#4a5568` on light mode; `#a0a8b4` / `#dcdfe6` on dark mode), satisfying the WCAG AA $\ge 4.5:1$ threshold.
+- **Non-Color Indicators**: Statuses never communicate state by color alone:
+  - `Approved`: `✓ Approved` (Green)
+  - `Rejected`: `✕ Rejected` (Red)
+  - `Pending / Submitted`: `⏳ Pending Approval` (Orange)
+  - `Borrowed`: `📦 Borrowed` (Blue)
+  - `Low Stock`: `⚠️ X (Low Stock)` (Red) vs `✓ X` (Normal)
+  - `Tool Condition`: `✓ Good Condition`, `⚠️ Needs Repair`, `✕ Broken`
+
+### D. In-App Notification Center
+- Integrated header popover with unread badge counter, keyboard focusability, and `aria-expanded` state.
+- Notifications are actionable: clicking or activating an item navigates directly to the target operational route (`/borrow`, `/procurement`, `/assets`, `/inventory`) without bypassing backend authorization.
+
+### E. Accessible Data Visualizations
+- Canvas-rendered Chart.js line charts in `AnalyticsDashboard.vue` are accompanied by a `.sr-only` semantic data table (`<caption>`, `<th>`, `<td>`), enabling screen readers to access exact outflow figures.
+- Progress bars provide full textual descriptions of equipment deployment: `${tool.currentlyOut} of ${tool.totalOwned} deployed (${utilizationPercent(tool)}%)`.
+
+### F. Dark Mode Architecture
+- Official Element Plus dark theme integration via `'element-plus/theme-chalk/dark/css-vars.css'`.
+- Light/Dark mode toggle in the navigation header with `aria-label="Switch to dark mode"` / `aria-label="Switch to light mode"`.
+- Persisted locally via `localStorage.getItem('theme')`.
+
+---
+
+## 14. Operational Gotchas & Future Roadmap
 
 ### Operational Gotchas
 1. **Hikari Connection Deadlocks with `REQUIRES_NEW`**: Maintain `spring.datasource.hikari.maximum-pool-size` at $\ge 20$.
 2. **Rate Limiting in Tests**: Use `RateLimiterService.resetAll()` in test fixtures if testing rapid authentication.
 3. **Sole Admin Protection**: `UserService` prevents deactivating the sole remaining active `ADMIN` to avoid platform lockout.
+4. **Contrast Tokens on Upgrades**: Ensure custom Element Plus theme overrides do not reset text colors to default `#909399`.
 
 ---
 *Document maintained by the SiteFlow Engineering Team.*

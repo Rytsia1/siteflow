@@ -148,36 +148,54 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
+  <div class="approval-dashboard-view">
+    <h1 class="page-title">Pending Approvals Dashboard</h1>
     <el-tabs v-model="activeTab">
       <!-- Borrow Requests Tab -->
       <el-tab-pane label="Borrow Requests" name="borrow">
         <div class="toolbar">
-          <h3>Pending Borrow Requests</h3>
-          <el-button :loading="loading" @click="loadPending">Refresh</el-button>
+          <h2 class="section-title">Pending Borrow Requests</h2>
+          <el-button :loading="loading" aria-label="Refresh pending borrow requests" @click="loadPending">Refresh</el-button>
         </div>
 
-        <el-table v-loading="loading" :data="requests" stripe border>
-          <el-table-column prop="id" label="ID" width="80" />
-          <el-table-column prop="requesterName" label="Requester" min-width="160" />
-          <el-table-column prop="locationName" label="Location" min-width="160" />
-          <el-table-column label="Requested On" width="180">
-            <template #default="{ row }">{{ formatDate(row.requestDate) }}</template>
-          </el-table-column>
-          <el-table-column label="Actions" width="220" fixed="right">
-            <template #default="{ row }">
-              <el-button type="success" size="small" :loading="approvingId === row.id" :disabled="approvingId !== null" @click="approve(row)">
-                Approve
-              </el-button>
-              <el-button type="danger" size="small" :disabled="approvingId !== null" @click="openRejectDialog(row)">Reject</el-button>
+        <div class="accessible-table-container" tabindex="0" role="region" aria-label="Pending Borrow Requests Table">
+          <el-table v-loading="loading" :data="requests" stripe border>
+            <el-table-column prop="id" label="ID" width="80" />
+            <el-table-column prop="requesterName" label="Requester" min-width="160" />
+            <el-table-column prop="locationName" label="Location" min-width="160" />
+            <el-table-column label="Requested On" width="180">
+              <template #default="{ row }">{{ formatDate(row.requestDate) }}</template>
+            </el-table-column>
+            <el-table-column label="Actions" width="220" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  type="success"
+                  size="small"
+                  :loading="approvingId === row.id"
+                  :disabled="approvingId !== null"
+                  :aria-label="`Approve borrow request #${row.id} for ${row.requesterName}`"
+                  @click="approve(row)"
+                >
+                  Approve
+                </el-button>
+                <el-button
+                  type="danger"
+                  size="small"
+                  :disabled="approvingId !== null"
+                  :aria-label="`Reject borrow request #${row.id} for ${row.requesterName}`"
+                  @click="openRejectDialog(row)"
+                >
+                  Reject
+                </el-button>
+              </template>
+            </el-table-column>
+            <template #empty>
+              <el-empty description="No pending borrow requests" />
             </template>
-          </el-table-column>
-          <template #empty>
-            <el-empty description="No pending borrow requests" />
-          </template>
-        </el-table>
+          </el-table>
+        </div>
 
-        <el-dialog v-model="rejectDialogVisible" title="Reject Borrow Request" width="420px">
+        <el-dialog v-model="rejectDialogVisible" title="Reject Borrow Request" width="420px" aria-modal="true">
           <el-form ref="rejectFormRef" :model="rejectForm" :rules="rejectRules" label-position="top">
             <el-form-item label="Rejection Note" prop="note">
               <el-input
@@ -185,6 +203,7 @@ onMounted(() => {
                 type="textarea"
                 :rows="3"
                 placeholder="Explain why this request is rejected"
+                aria-label="Rejection note explanation"
               />
             </el-form-item>
           </el-form>
@@ -198,39 +217,48 @@ onMounted(() => {
       <!-- Material Requests Tab -->
       <el-tab-pane label="Material Requests" name="material">
         <div class="toolbar">
-          <h3>Pending Material Requests</h3>
-          <el-button :loading="loadingMr" @click="loadPendingMr">Refresh</el-button>
+          <h2 class="section-title">Pending Material Requests</h2>
+          <el-button :loading="loadingMr" aria-label="Refresh pending material requests" @click="loadPendingMr">Refresh</el-button>
         </div>
 
-        <el-table v-loading="loadingMr" :data="materialRequests" stripe border>
-          <el-table-column prop="id" label="MR ID" width="90" />
-          <el-table-column prop="requesterName" label="Requester" min-width="160" />
-          <el-table-column prop="justification" label="Justification" min-width="220" show-overflow-tooltip />
-          <el-table-column label="Requested On" width="180">
-            <template #default="{ row }">{{ formatDate(row.requestDate) }}</template>
-          </el-table-column>
-          <el-table-column label="Actions" width="220" fixed="right">
-            <template #default="{ row }">
-              <el-button
-                type="success"
-                size="small"
-                :loading="approvingMrId === row.id"
-                :disabled="approvingMrId !== null"
-                @click="approveMr(row)"
-              >
-                Approve
-              </el-button>
-              <el-button type="danger" size="small" :disabled="approvingMrId !== null" @click="openRejectMrDialog(row)">
-                Reject
-              </el-button>
+        <div class="accessible-table-container" tabindex="0" role="region" aria-label="Pending Material Requests Table">
+          <el-table v-loading="loadingMr" :data="materialRequests" stripe border>
+            <el-table-column prop="id" label="MR ID" width="90" />
+            <el-table-column prop="requesterName" label="Requester" min-width="160" />
+            <el-table-column prop="justification" label="Justification" min-width="220" show-overflow-tooltip />
+            <el-table-column label="Requested On" width="180">
+              <template #default="{ row }">{{ formatDate(row.requestDate) }}</template>
+            </el-table-column>
+            <el-table-column label="Actions" width="220" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  type="success"
+                  size="small"
+                  :loading="approvingMrId === row.id"
+                  :disabled="approvingMrId !== null"
+                  :aria-label="`Approve material request #${row.id} for ${row.requesterName}`"
+                  @click="approveMr(row)"
+                >
+                  Approve
+                </el-button>
+                <el-button
+                  type="danger"
+                  size="small"
+                  :disabled="approvingMrId !== null"
+                  :aria-label="`Reject material request #${row.id} for ${row.requesterName}`"
+                  @click="openRejectMrDialog(row)"
+                >
+                  Reject
+                </el-button>
+              </template>
+            </el-table-column>
+            <template #empty>
+              <el-empty description="No pending material requests" />
             </template>
-          </el-table-column>
-          <template #empty>
-            <el-empty description="No pending material requests" />
-          </template>
-        </el-table>
+          </el-table>
+        </div>
 
-        <el-dialog v-model="rejectMrDialogVisible" title="Reject Material Request" width="420px">
+        <el-dialog v-model="rejectMrDialogVisible" title="Reject Material Request" width="420px" aria-modal="true">
           <el-form ref="rejectMrFormRef" :model="rejectMrForm" :rules="rejectMrRules" label-position="top">
             <el-form-item label="Rejection Note" prop="note">
               <el-input
@@ -238,6 +266,7 @@ onMounted(() => {
                 type="textarea"
                 :rows="3"
                 placeholder="Explain why this material request is rejected"
+                aria-label="Rejection note explanation"
               />
             </el-form-item>
           </el-form>

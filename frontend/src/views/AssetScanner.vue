@@ -88,41 +88,62 @@ onMounted(focusScanInput)
 </script>
 
 <template>
-  <el-card style="max-width: 560px">
-    <template #header>
-      <h3>Asset Scanner</h3>
-    </template>
+  <div class="asset-scanner-view">
+    <h1 class="page-title">Asset Barcode & QR Scanner</h1>
+    <el-card style="max-width: 560px">
+      <template #header>
+        <h2 class="section-title">Scan Operations</h2>
+      </template>
 
-    <el-radio-group v-model="mode" style="margin-bottom: 20px" @change="handleModeChange">
-      <el-radio-button label="checkout">Checkout Mode</el-radio-button>
-      <el-radio-button label="return">Return Mode</el-radio-button>
-    </el-radio-group>
+      <el-radio-group v-model="mode" aria-label="Scanner Mode" style="margin-bottom: 20px" @change="handleModeChange">
+        <el-radio-button label="checkout">Checkout Mode</el-radio-button>
+        <el-radio-button label="return">Return Mode</el-radio-button>
+      </el-radio-group>
 
-    <el-form label-position="top">
-      <el-form-item v-if="mode === 'checkout'" label="Borrow Request ID">
-        <el-input-number
-          v-model="borrowRequestId"
-          :min="1"
-          controls-position="right"
-          style="width: 100%"
-        />
-      </el-form-item>
+      <el-form label-position="top">
+        <el-form-item v-if="mode === 'checkout'" label="Borrow Request ID">
+          <el-input-number
+            v-model="borrowRequestId"
+            :min="1"
+            controls-position="right"
+            aria-label="Borrow Request ID for checkout"
+            style="width: 100%"
+          />
+        </el-form-item>
 
-      <el-form-item v-else label="Tool Condition">
-        <el-select v-model="toolCondition" placeholder="Select condition" style="width: 100%">
-          <el-option v-for="opt in conditionOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-        </el-select>
-      </el-form-item>
+        <el-form-item v-else label="Tool Condition">
+          <el-select
+            v-model="toolCondition"
+            placeholder="Select condition"
+            aria-label="Tool Condition on return"
+            style="width: 100%"
+          >
+            <el-option v-for="opt in conditionOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          </el-select>
+        </el-form-item>
 
-      <el-form-item label="Scan Barcode / QR Code">
-        <el-input
-          ref="scanInputRef"
-          v-model="scanValue"
-          placeholder="Scan or type a serial number, then press Enter"
-          :disabled="submitting"
-          @keyup.enter="handleScan"
-        />
-      </el-form-item>
-    </el-form>
-  </el-card>
+        <el-form-item label="Scan Barcode / QR Code">
+          <div style="display: flex; gap: 8px; width: 100%;">
+            <el-input
+              ref="scanInputRef"
+              v-model="scanValue"
+              placeholder="Scan or type a serial number"
+              aria-label="Asset barcode or serial number"
+              :disabled="submitting"
+              @keyup.enter="handleScan"
+            />
+            <el-button
+              type="primary"
+              :loading="submitting"
+              :disabled="submitting || !scanValue.trim()"
+              aria-label="Process asset scan"
+              @click="handleScan"
+            >
+              Process
+            </el-button>
+          </div>
+        </el-form-item>
+      </el-form>
+    </el-card>
+  </div>
 </template>

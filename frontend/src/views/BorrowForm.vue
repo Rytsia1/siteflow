@@ -140,126 +140,145 @@ async function handleReturnSubmit() {
 </script>
 
 <template>
-  <el-tabs v-model="activeTab">
-    <el-tab-pane label="New Borrow Request" name="new">
-      <el-card style="max-width: 640px">
-        <template #header>
-          <h3>New Borrow Request</h3>
-        </template>
+  <div class="borrow-form-view">
+    <h1 class="page-title">Tool Borrowing & Returns</h1>
+    <el-tabs v-model="activeTab">
+      <el-tab-pane label="New Borrow Request" name="new">
+        <el-card style="max-width: 640px">
+          <template #header>
+            <h2 class="section-title">New Borrow Request</h2>
+          </template>
 
-        <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
-          <el-form-item label="Location" prop="locationId">
-            <el-select
-              v-model="form.locationId"
-              placeholder="Select warehouse or site"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="loc in locations"
-                :key="loc.id"
-                :label="loc.locationName"
-                :value="loc.id"
-              />
-            </el-select>
-          </el-form-item>
-
-          <el-form-item label="Items to Borrow">
-            <div v-for="(line, index) in form.lines" :key="index" class="item-row">
-              <el-form-item
-                :prop="`lines.${index}.itemId`"
-                :rules="lineItemIdRule()"
-                class="item-select"
+          <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
+            <el-form-item label="Location" prop="locationId">
+              <el-select
+                v-model="form.locationId"
+                placeholder="Select warehouse or site"
+                aria-label="Select location"
+                style="width: 100%"
               >
-                <el-select
-                  v-model="line.itemId"
-                  placeholder="Select item"
-                  filterable
-                  style="width: 100%"
-                >
-                  <el-option
-                    v-for="item in items"
-                    :key="item.id"
-                    :label="`${item.itemCode} - ${item.name}`"
-                    :value="item.id"
-                  />
-                </el-select>
-              </el-form-item>
-              <el-input-number v-model="line.qty" :min="1" controls-position="right" />
-              <el-button
-                type="danger"
-                plain
-                :disabled="form.lines.length === 1"
-                @click="removeLine(index)"
-              >
-                Remove
-              </el-button>
-            </div>
-            <el-button @click="addLine">+ Add Item</el-button>
-          </el-form-item>
-
-          <el-form-item>
-            <el-button type="primary" :loading="submitting" :disabled="submitting" @click="handleSubmit">
-              Submit Borrow Request
-            </el-button>
-          </el-form-item>
-        </el-form>
-      </el-card>
-    </el-tab-pane>
-
-    <el-tab-pane label="Process Return" name="return">
-      <el-card style="max-width: 640px">
-        <template #header>
-          <h3>Process Return</h3>
-        </template>
-
-        <el-form ref="returnFormRef" :model="returnForm" :rules="returnRules" label-position="top">
-          <el-form-item label="Borrow Request ID" prop="requestId">
-            <el-input-number
-              v-model="returnForm.requestId"
-              :min="1"
-              controls-position="right"
-              placeholder="Enter Borrow Request ID"
-              style="width: 100%"
-            />
-          </el-form-item>
-
-          <el-form-item label="Items to Return">
-            <div v-for="(line, index) in returnForm.lines" :key="index" class="item-row">
-              <el-form-item
-                :prop="`lines.${index}.borrowItemId`"
-                :rules="returnItemIdRule()"
-                class="item-select"
-              >
-                <el-input-number
-                  v-model="line.borrowItemId"
-                  :min="1"
-                  controls-position="right"
-                  placeholder="Borrow Item ID"
-                  style="width: 100%"
+                <el-option
+                  v-for="loc in locations"
+                  :key="loc.id"
+                  :label="loc.locationName"
+                  :value="loc.id"
                 />
-              </el-form-item>
-              <el-input-number v-model="line.qty" :min="1" controls-position="right" />
-              <el-button
-                type="danger"
-                plain
-                :disabled="returnForm.lines.length === 1"
-                @click="removeReturnLine(index)"
-              >
-                Remove
-              </el-button>
-            </div>
-            <el-button @click="addReturnLine">+ Add Item</el-button>
-          </el-form-item>
+              </el-select>
+            </el-form-item>
 
-          <el-form-item>
-            <el-button type="primary" :loading="submittingReturn" :disabled="submittingReturn" @click="handleReturnSubmit">
-              Process Return
-            </el-button>
-          </el-form-item>
-        </el-form>
-      </el-card>
-    </el-tab-pane>
-  </el-tabs>
+            <el-form-item label="Items to Borrow">
+              <div v-for="(line, index) in form.lines" :key="index" class="item-row">
+                <el-form-item
+                  :prop="`lines.${index}.itemId`"
+                  :rules="lineItemIdRule()"
+                  class="item-select"
+                >
+                  <el-select
+                    v-model="line.itemId"
+                    placeholder="Select item"
+                    :aria-label="`Select item for line ${index + 1}`"
+                    filterable
+                    style="width: 100%"
+                  >
+                    <el-option
+                      v-for="item in items"
+                      :key="item.id"
+                      :label="`${item.itemCode} - ${item.name}`"
+                      :value="item.id"
+                    />
+                  </el-select>
+                </el-form-item>
+                <el-input-number
+                  v-model="line.qty"
+                  :min="1"
+                  :aria-label="`Quantity for line ${index + 1}`"
+                  controls-position="right"
+                />
+                <el-button
+                  type="danger"
+                  plain
+                  :disabled="form.lines.length === 1"
+                  :aria-label="`Remove line ${index + 1}`"
+                  @click="removeLine(index)"
+                >
+                  Remove
+                </el-button>
+              </div>
+              <el-button aria-label="Add another item line" @click="addLine">+ Add Item</el-button>
+            </el-form-item>
+
+            <el-form-item>
+              <el-button type="primary" :loading="submitting" :disabled="submitting" @click="handleSubmit">
+                Submit Borrow Request
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </el-tab-pane>
+
+      <el-tab-pane label="Process Return" name="return">
+        <el-card style="max-width: 640px">
+          <template #header>
+            <h2 class="section-title">Process Return</h2>
+          </template>
+
+          <el-form ref="returnFormRef" :model="returnForm" :rules="returnRules" label-position="top">
+            <el-form-item label="Borrow Request ID" prop="requestId">
+              <el-input-number
+                v-model="returnForm.requestId"
+                :min="1"
+                controls-position="right"
+                placeholder="Enter Borrow Request ID"
+                aria-label="Borrow Request ID"
+                style="width: 100%"
+              />
+            </el-form-item>
+
+            <el-form-item label="Items to Return">
+              <div v-for="(line, index) in returnForm.lines" :key="index" class="item-row">
+                <el-form-item
+                  :prop="`lines.${index}.borrowItemId`"
+                  :rules="returnItemIdRule()"
+                  class="item-select"
+                >
+                  <el-input-number
+                    v-model="line.borrowItemId"
+                    :min="1"
+                    controls-position="right"
+                    placeholder="Borrow Item ID"
+                    :aria-label="`Borrow Item ID for line ${index + 1}`"
+                    style="width: 100%"
+                  />
+                </el-form-item>
+                <el-input-number
+                  v-model="line.qty"
+                  :min="1"
+                  :aria-label="`Return quantity for line ${index + 1}`"
+                  controls-position="right"
+                />
+                <el-button
+                  type="danger"
+                  plain
+                  :disabled="returnForm.lines.length === 1"
+                  :aria-label="`Remove return line ${index + 1}`"
+                  @click="removeReturnLine(index)"
+                >
+                  Remove
+                </el-button>
+              </div>
+              <el-button aria-label="Add another return item line" @click="addReturnLine">+ Add Item</el-button>
+            </el-form-item>
+
+            <el-form-item>
+              <el-button type="primary" :loading="submittingReturn" :disabled="submittingReturn" @click="handleReturnSubmit">
+                Process Return
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </el-tab-pane>
+    </el-tabs>
+  </div>
 </template>
 
 <style scoped>

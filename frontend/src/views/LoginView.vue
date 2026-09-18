@@ -46,13 +46,34 @@ async function handleSubmit() {
       </template>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent="handleSubmit">
         <el-form-item label="Username" prop="username">
-          <el-input v-model="form.username" placeholder="e.g. pekerja" />
+          <el-input
+            id="login-username"
+            v-model="form.username"
+            placeholder="e.g. pekerja"
+            autocomplete="username"
+            aria-required="true"
+          />
         </el-form-item>
         <el-form-item label="Password" prop="password">
-          <el-input v-model="form.password" type="password" show-password @keyup.enter="handleSubmit" />
+          <el-input
+            id="login-password"
+            v-model="form.password"
+            type="password"
+            autocomplete="current-password"
+            show-password
+            aria-required="true"
+            @keyup.enter="handleSubmit"
+          />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :loading="loading" style="width: 100%" @click="handleSubmit">
+          <el-button
+            type="primary"
+            native-type="submit"
+            :loading="loading"
+            :disabled="loading"
+            style="width: 100%"
+            @click="handleSubmit"
+          >
             Log In
           </el-button>
         </el-form-item>
@@ -72,32 +93,36 @@ async function handleSubmit() {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: #f5f7fa;
+  background-color: var(--siteflow-bg-page);
 }
 
 .login-card {
   width: 360px;
+  background-color: var(--siteflow-bg-card);
+  border-color: var(--siteflow-border-color);
 }
 
 .login-footer {
   margin-top: 16px;
   text-align: center;
-  font-size: 12px;
-  color: #909399;
+  font-size: 13px;
+  color: var(--siteflow-text-muted);
 }
 
 .legal-link {
-  color: #909399;
+  color: var(--siteflow-text-muted);
   text-decoration: none;
+  font-weight: 500;
 }
 
-.legal-link:hover {
-  color: #409eff;
+.legal-link:hover,
+.legal-link:focus-visible {
+  color: var(--siteflow-link-color);
   text-decoration: underline;
 }
 
 .divider {
   margin: 0 8px;
-  color: #dcdfe6;
+  color: var(--siteflow-border-color);
 }
 </style>

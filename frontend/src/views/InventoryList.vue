@@ -118,50 +118,82 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
-    <div class="toolbar">
+  <div class="inventory-page">
+    <h1 class="page-title">Inventory Catalog &amp; Stock Levels</h1>
+
+    <div class="toolbar" role="search" aria-label="Inventory search and filter tools">
       <el-input
         v-model="searchText"
         placeholder="Search by item code or name"
+        aria-label="Search inventory by item code or name"
         clearable
         style="width: 280px"
       />
-      <el-select v-model="categoryFilter" placeholder="All categories" clearable style="width: 200px">
+      <el-select
+        v-model="categoryFilter"
+        placeholder="All categories"
+        aria-label="Filter items by category"
+        clearable
+        style="width: 200px"
+      >
         <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
       </el-select>
-      <el-button :loading="loading" @click="loadItems">Refresh</el-button>
-      <el-button v-if="canAdjustStock" type="primary" @click="openAdjustmentDialog()">
+      <el-button :loading="loading" :disabled="loading" aria-label="Refresh inventory items" @click="loadItems">
+        Refresh
+      </el-button>
+      <el-button v-if="canAdjustStock" type="primary" aria-label="Open manual stock adjustment dialog" @click="openAdjustmentDialog()">
         Adjust Stock
       </el-button>
     </div>
 
-    <el-table v-loading="loading" :data="filteredItems" stripe border>
-      <el-table-column prop="itemCode" label="Item Code" width="140" />
-      <el-table-column prop="name" label="Name" min-width="200" />
-      <el-table-column label="Category" width="150">
-        <template #default="{ row }">
-          <el-tag :type="categoryTagType[row.category] || 'info'">{{ categoryLabel(row.category) }}</el-tag>
+    <div class="accessible-table-container" tabindex="0" aria-label="Inventory items table">
+      <el-table v-loading="loading" :data="filteredItems" stripe border>
+        <el-table-column prop="itemCode" label="Item Code" width="140" />
+        <el-table-column prop="name" label="Name" min-width="200" />
+        <el-table-column label="Category" width="150">
+          <template #default="{ row }">
+            <el-tag :type="categoryTagType[row.category] || 'info'">{{ categoryLabel(row.category) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="unit" label="Unit" width="100" />
+        <el-table-column label="Current Stock" width="180">
+          <template #default="{ row }">
+            <span
+              :class="['status-badge', row.totalQty <= row.minStockThreshold ? 'danger' : 'success']"
+              :aria-label="`Stock level: ${row.totalQty} units ${row.totalQty <= row.minStockThreshold ? '(Low stock below threshold of ' + row.minStockThreshold + ')' : '(In stock)'}`"
+            >
+              <span v-if="row.totalQty <= row.minStockThreshold">⚠️ {{ row.totalQty }} (Low Stock)</span>
+              <span v-else>✓ {{ row.totalQty }}</span>
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="canAdjustStock" label="Actions" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              size="small"
+              :aria-label="`Adjust stock for ${row.name} (${row.itemCode})`"
+              @click="openAdjustmentDialog(row)"
+            >
+              Adjust
+            </el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <el-empty
+            v-if="searchText || categoryFilter"
+            description="No items match your search or filter criteria. Try clearing the filter."
+          />
+          <el-empty v-else description="No inventory items currently registered in the system." />
         </template>
-      </el-table-column>
-      <el-table-column prop="unit" label="Unit" width="100" />
-      <el-table-column label="Current Stock" width="160">
-        <template #default="{ row }">
-          <el-tag :type="row.totalQty <= row.minStockThreshold ? 'danger' : 'success'">
-            {{ row.totalQty }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="canAdjustStock" label="Actions" width="120" fixed="right">
-        <template #default="{ row }">
-          <el-button size="small" @click="openAdjustmentDialog(row)">Adjust</el-button>
-        </template>
-      </el-table-column>
-      <template #empty>
-        <el-empty description="No items found" />
-      </template>
-    </el-table>
+      </el-table>
+    </div>
 
-    <el-dialog v-model="adjustDialogVisible" title="Adjust Stock" width="480px">
+    <el-dialog
+      v-model="adjustDialogVisible"
+      title="Adjust Stock"
+      width="480px"
+      aria-modal="true"
+    >
       <el-form ref="adjustFormRef" :model="adjustForm" :rules="adjustRules" label-position="top">
         <el-form-item label="Item" prop="itemId">
           <el-select v-model="adjustForm.itemId" placeholder="Select item" filterable style="width: 100%">

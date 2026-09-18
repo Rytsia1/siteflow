@@ -1,0 +1,210 @@
+/* ==========================================================================
+   SiteFlow Accessibility & Theme Design System (WCAG 2.1 AA Compliant)
+   ========================================================================== */
+
+:root {
+  /* High-contrast color tokens (Light Mode) */
+  --siteflow-bg-page: #f5f7fa;
+  --siteflow-bg-card: #ffffff;
+  --siteflow-border-color: #dcdfe6;
+  --siteflow-text-primary: #1f2f3d;
+  --siteflow-text-regular: #4a5568;
+  --siteflow-text-muted: #595959;
+  --siteflow-text-placeholder: #718096;
+  --siteflow-link-color: #2b6cb0;
+  --siteflow-link-hover: #1a4971;
+
+  /* Focus Indicator Ring */
+  --siteflow-focus-ring-color: #409eff;
+  --siteflow-focus-ring-offset: 2px;
+  --siteflow-focus-ring-width: 2px;
+
+  /* Status Colors with Verified AA Contrast (>= 4.5:1 text on badge) */
+  --siteflow-status-success-bg: #e1f3d8;
+  --siteflow-status-success-text: #176924;
+  --siteflow-status-warning-bg: #faecd8;
+  --siteflow-status-warning-text: #8c5303;
+  --siteflow-status-danger-bg: #fde2e2;
+  --siteflow-status-danger-text: #991b1b;
+  --siteflow-status-info-bg: #e9e9eb;
+  --siteflow-status-info-text: #374151;
+}
+
+html.dark {
+  /* High-contrast color tokens (Dark Mode) */
+  --siteflow-bg-page: #121212;
+  --siteflow-bg-card: #1e1e1e;
+  --siteflow-border-color: #363636;
+  --siteflow-text-primary: #f0f2f5;
+  --siteflow-text-regular: #d1d5db;
+  --siteflow-text-muted: #9ca3af;
+  --siteflow-text-placeholder: #6b7280;
+  --siteflow-link-color: #79bbff;
+  --siteflow-link-hover: #a0cfff;
+
+  /* Dark Mode Focus Ring */
+  --siteflow-focus-ring-color: #79bbff;
+
+  /* Dark Mode Status Badges */
+  --siteflow-status-success-bg: #132e18;
+  --siteflow-status-success-text: #67c23a;
+  --siteflow-status-warning-bg: #332514;
+  --siteflow-status-warning-text: #e6a23c;
+  --siteflow-status-danger-bg: #3b1818;
+  --siteflow-status-danger-text: #f56c6c;
+  --siteflow-status-info-bg: #262729;
+  --siteflow-status-info-text: #909399;
+}
+
+/* ==========================================================================
+   Global Typography & Layout Defaults
+   ========================================================================== */
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: var(--siteflow-text-regular);
+  background-color: var(--siteflow-bg-page);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================================================
+   Skip to Content Link (WCAG 2.4.1 Bypass Blocks)
+   ========================================================================== */
+
+.skip-link {
+  position: absolute;
+  top: -60px;
+  left: 16px;
+  background: var(--siteflow-focus-ring-color);
+  color: #ffffff;
+  padding: 10px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  z-index: 9999;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: top 0.15s ease-in-out;
+}
+
+.skip-link:focus {
+  top: 16px;
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Universal Visible Focus Indicator (WCAG 2.4.7 Focus Visible)
+   ========================================================================== */
+
+:focus-visible {
+  outline: var(--siteflow-focus-ring-width) solid var(--siteflow-focus-ring-color) !important;
+  outline-offset: var(--siteflow-focus-ring-offset) !important;
+}
+
+/* Ensure Element Plus inputs, buttons, and custom controls have clear focus */
+.el-button:focus-visible,
+.el-input__inner:focus-visible,
+.el-textarea__inner:focus-visible,
+.el-select__wrapper:focus-visible,
+.el-menu-item:focus-visible,
+.el-radio-button__inner:focus-visible {
+  outline: var(--siteflow-focus-ring-width) solid var(--siteflow-focus-ring-color) !important;
+  outline-offset: var(--siteflow-focus-ring-offset) !important;
+}
+
+/* ==========================================================================
+   Screen Reader Only Utility (WCAG 1.3.1 Info and Relationships)
+   ========================================================================== */
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Focusable when tabbed into (e.g. table summary or accessible controls) */
+.sr-only-focusable:focus {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+}
+
+/* ==========================================================================
+   Accessible Page Headings & Typography
+   ========================================================================== */
+
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--siteflow-text-primary);
+  margin: 0 0 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ==========================================================================
+   Accessible Table Wrapper with Keyboard Scroll Support
+   ========================================================================== */
+
+.accessible-table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 4px;
+}
+
+.accessible-table-container:focus-visible {
+  outline: 2px solid var(--siteflow-focus-ring-color);
+  outline-offset: 1px;
+}
+
+/* ==========================================================================
+   High-Contrast Status Indicators (Color + Text/Icon Non-Color Indicators)
+   ========================================================================== */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.status-badge.success {
+  background-color: var(--siteflow-status-success-bg);
+  color: var(--siteflow-status-success-text);
+  border: 1px solid var(--siteflow-status-success-text);
+}
+
+.status-badge.warning {
+  background-color: var(--siteflow-status-warning-bg);
+  color: var(--siteflow-status-warning-text);
+  border: 1px solid var(--siteflow-status-warning-text);
+}
+
+.status-badge.danger {
+  background-color: var(--siteflow-status-danger-bg);
+  color: var(--siteflow-status-danger-text);
+  border: 1px solid var(--siteflow-status-danger-text);
+}
+
+.status-badge.info {
+  background-color: var(--siteflow-status-info-bg);
+  color: var(--siteflow-status-info-text);
+  border: 1px solid var(--siteflow-status-info-text);
+}

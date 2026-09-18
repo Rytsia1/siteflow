@@ -146,6 +146,7 @@ onMounted(() => {
 
 <template>
   <div class="analytics-dashboard">
+    <h1 class="page-title">Analytics & Demand Forecasting</h1>
     <el-row :gutter="16">
       <el-col :xs="24" :sm="12" :md="8">
         <el-card v-loading="loadingSummary" shadow="never">
@@ -168,25 +169,53 @@ onMounted(() => {
     <el-row :gutter="16" class="section-row">
       <el-col :xs="24" :md="14">
         <el-card v-loading="loadingTrends" shadow="never">
-          <template #header>Consumption Trends (last 6 months)</template>
-          <div class="chart-container">
-            <Line v-if="trends.length" :data="chartData" :options="chartOptions" />
+          <template #header>
+            <h2 class="section-title">Consumption Trends (last 6 months)</h2>
+          </template>
+          <div class="chart-container" role="region" aria-label="Consumption Trends Line Chart">
+            <Line
+              v-if="trends.length"
+              :data="chartData"
+              :options="chartOptions"
+              aria-label="Consumable outflow trends line chart over the last 6 months"
+            />
             <el-empty v-else description="No consumption data in this period" />
           </div>
+
+          <!-- Accessible data table alternative for screen readers -->
+          <table v-if="trends.length" class="sr-only">
+            <caption>Consumable Outflow Trends (Last 6 Months)</caption>
+            <thead>
+              <tr>
+                <th scope="col">Period</th>
+                <th scope="col">Consumable Outflow</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="t in trends" :key="t.period">
+                <td>{{ t.period }}</td>
+                <td>{{ t.totalOutflow }}</td>
+              </tr>
+            </tbody>
+          </table>
         </el-card>
       </el-col>
+
       <el-col :xs="24" :md="10">
         <el-card v-loading="loadingUtilization" shadow="never">
-          <template #header>Tool Utilization</template>
+          <template #header>
+            <h2 class="section-title">Tool Utilization</h2>
+          </template>
           <div v-if="toolUtilization.length" class="tool-utilization">
             <div v-for="tool in toolUtilization" :key="tool.itemId" class="tool-row">
               <div class="tool-label">
                 <span>{{ tool.itemName }}</span>
-                <span>{{ tool.currentlyOut }} / {{ tool.totalOwned }}</span>
+                <span>{{ tool.currentlyOut }} of {{ tool.totalOwned }} deployed ({{ utilizationPercent(tool) }}%)</span>
               </div>
               <el-progress
                 :percentage="utilizationPercent(tool)"
                 :status="utilizationStatus(tool)"
+                :aria-label="`${tool.itemName} utilization: ${tool.currentlyOut} of ${tool.totalOwned} (${utilizationPercent(tool)}%)`"
               />
             </div>
           </div>
@@ -196,30 +225,35 @@ onMounted(() => {
     </el-row>
 
     <el-card v-loading="loadingReorder" shadow="never" class="section-row">
-      <template #header>Reorder &amp; Forecasting Report</template>
-      <el-table :data="reorderRows" stripe border>
-        <el-table-column prop="itemName" label="Item Name" min-width="180" />
-        <el-table-column prop="currentQty" label="Current Stock" width="130" />
-        <el-table-column prop="minStockThreshold" label="Minimum Threshold" width="160" />
-        <el-table-column prop="forecastedDemand" label="SMA Forecast" width="130" />
-        <el-table-column prop="recommendedQty" label="Recommended Reorder Qty" width="200" />
-        <el-table-column label="Action" width="160" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              type="primary"
-              size="small"
-              :loading="draftingId === row.itemId"
-              :disabled="row.recommendedQty <= 0"
-              @click="draftMaterialRequest(row)"
-            >
-              Draft MR
-            </el-button>
+      <template #header>
+        <h2 class="section-title">Reorder &amp; Forecasting Report</h2>
+      </template>
+      <div class="accessible-table-container" tabindex="0" role="region" aria-label="Reorder and Forecasting Report Table">
+        <el-table :data="reorderRows" stripe border>
+          <el-table-column prop="itemName" label="Item Name" min-width="180" />
+          <el-table-column prop="currentQty" label="Current Stock" width="130" />
+          <el-table-column prop="minStockThreshold" label="Minimum Threshold" width="160" />
+          <el-table-column prop="forecastedDemand" label="SMA Forecast" width="130" />
+          <el-table-column prop="recommendedQty" label="Recommended Reorder Qty" width="200" />
+          <el-table-column label="Action" width="160" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                type="primary"
+                size="small"
+                :loading="draftingId === row.itemId"
+                :disabled="row.recommendedQty <= 0"
+                :aria-label="`Draft Material Request for ${row.itemName} with recommended quantity ${row.recommendedQty}`"
+                @click="draftMaterialRequest(row)"
+              >
+                Draft MR
+              </el-button>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <el-empty description="No items currently need reordering" />
           </template>
-        </el-table-column>
-        <template #empty>
-          <el-empty description="No items currently need reordering" />
-        </template>
-      </el-table>
+        </el-table>
+      </div>
     </el-card>
   </div>
 </template>

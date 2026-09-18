@@ -196,139 +196,185 @@ onMounted(() => {
 </script>
 
 <template>
-  <el-tabs v-model="activeTab">
-    <el-tab-pane label="New Material Request" name="submit">
-      <el-card style="max-width: 640px">
-        <el-form label-position="top">
-          <el-form-item label="Justification">
-            <el-input
-              v-model="mrForm.justification"
-              type="textarea"
-              :rows="2"
-              placeholder="Why is this material needed?"
-            />
-          </el-form-item>
+  <div class="procurement-view">
+    <h1 class="page-title">Procurement & Material Requests</h1>
+    <el-tabs v-model="activeTab">
+      <el-tab-pane label="New Material Request" name="submit">
+        <el-card style="max-width: 640px">
+          <template #header>
+            <h2 class="section-title">New Material Request</h2>
+          </template>
+          <el-form label-position="top">
+            <el-form-item label="Justification">
+              <el-input
+                v-model="mrForm.justification"
+                type="textarea"
+                :rows="2"
+                placeholder="Why is this material needed?"
+                aria-label="Justification for material request"
+              />
+            </el-form-item>
 
-          <el-form-item label="Items">
-            <div v-for="(line, index) in mrForm.lines" :key="index" class="item-row">
-              <el-select v-model="line.itemId" placeholder="Search item" filterable class="item-select">
-                <el-option
-                  v-for="item in items"
-                  :key="item.id"
-                  :label="`${item.itemCode} — ${item.name}`"
-                  :value="item.id"
+            <el-form-item label="Items">
+              <div v-for="(line, index) in mrForm.lines" :key="index" class="item-row">
+                <el-select
+                  v-model="line.itemId"
+                  placeholder="Search item"
+                  filterable
+                  :aria-label="`Material item for line ${index + 1}`"
+                  class="item-select"
+                >
+                  <el-option
+                    v-for="item in items"
+                    :key="item.id"
+                    :label="`${item.itemCode} — ${item.name}`"
+                    :value="item.id"
+                  />
+                </el-select>
+                <el-input-number
+                  v-model="line.qty"
+                  :min="1"
+                  :aria-label="`Quantity for line ${index + 1}`"
                 />
-              </el-select>
-              <el-input-number v-model="line.qty" :min="1" />
-              <el-button
-                type="danger"
-                plain
-                :disabled="mrForm.lines.length === 1"
-                @click="removeLine(index)"
-              >
-                Remove
+                <el-button
+                  type="danger"
+                  plain
+                  :disabled="mrForm.lines.length === 1"
+                  :aria-label="`Remove material line ${index + 1}`"
+                  @click="removeLine(index)"
+                >
+                  Remove
+                </el-button>
+              </div>
+              <el-button aria-label="Add another material item line" @click="addLine">+ Add Item</el-button>
+            </el-form-item>
+
+            <el-form-item>
+              <el-button type="primary" :loading="submitting" :disabled="submitting" @click="submitMaterialRequest">
+                Submit Material Request
               </el-button>
-            </div>
-            <el-button @click="addLine">+ Add Item</el-button>
-          </el-form-item>
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </el-tab-pane>
 
-          <el-form-item>
-            <el-button type="primary" :loading="submitting" :disabled="submitting" @click="submitMaterialRequest">
-              Submit Material Request
-            </el-button>
-          </el-form-item>
-        </el-form>
-      </el-card>
-    </el-tab-pane>
+      <el-tab-pane v-if="canApprove" label="Pending Approval" name="pending">
+        <div class="toolbar">
+          <h2 class="section-title">Pending Material Requests</h2>
+          <el-button :loading="loadingPending" aria-label="Refresh pending material requests" @click="loadPendingRequests">Refresh</el-button>
+        </div>
 
-    <el-tab-pane v-if="canApprove" label="Pending Approval" name="pending">
-      <div class="toolbar">
-        <h3>Pending Material Requests</h3>
-        <el-button :loading="loadingPending" @click="loadPendingRequests">Refresh</el-button>
-      </div>
+        <div class="accessible-table-container" tabindex="0" role="region" aria-label="Pending Material Requests Table">
+          <el-table v-loading="loadingPending" :data="pendingRequests" stripe border>
+            <el-table-column prop="id" label="MR ID" width="90" />
+            <el-table-column prop="requesterName" label="Requester" min-width="160" />
+            <el-table-column prop="justification" label="Justification" min-width="220" show-overflow-tooltip />
+            <el-table-column label="Requested On" width="180">
+              <template #default="{ row }">{{ formatDate(row.requestDate) }}</template>
+            </el-table-column>
+            <el-table-column label="Actions" width="220" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  type="success"
+                  size="small"
+                  :loading="approvingId === row.id"
+                  :disabled="approvingId !== null"
+                  :aria-label="`Approve material request #${row.id} for ${row.requesterName}`"
+                  @click="approve(row)"
+                >
+                  Approve
+                </el-button>
+                <el-button
+                  type="danger"
+                  size="small"
+                  :disabled="approvingId !== null"
+                  :aria-label="`Reject material request #${row.id} for ${row.requesterName}`"
+                  @click="openRejectDialog(row)"
+                >
+                  Reject
+                </el-button>
+              </template>
+            </el-table-column>
+            <template #empty>
+              <el-empty description="No pending requests" />
+            </template>
+          </el-table>
+        </div>
+      </el-tab-pane>
 
-      <el-table v-loading="loadingPending" :data="pendingRequests" stripe border>
-        <el-table-column prop="id" label="MR ID" width="90" />
-        <el-table-column prop="requesterName" label="Requester" min-width="160" />
-        <el-table-column prop="justification" label="Justification" min-width="220" show-overflow-tooltip />
-        <el-table-column label="Requested On" width="180">
-          <template #default="{ row }">{{ formatDate(row.requestDate) }}</template>
-        </el-table-column>
-        <el-table-column label="Actions" width="220" fixed="right">
-          <template #default="{ row }">
-            <el-button type="success" size="small" :loading="approvingId === row.id" :disabled="approvingId !== null" @click="approve(row)">
-              Approve
-            </el-button>
-            <el-button type="danger" size="small" :disabled="approvingId !== null" @click="openRejectDialog(row)">Reject</el-button>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <el-empty description="No pending requests" />
-        </template>
-      </el-table>
-    </el-tab-pane>
+      <el-tab-pane v-if="isAdmin" label="Approved Requests" name="approved">
+        <div class="toolbar">
+          <h2 class="section-title">Approved Material Requests</h2>
+          <el-button :loading="loadingApproved" aria-label="Refresh approved material requests" @click="loadApprovedRequests">Refresh</el-button>
+        </div>
 
-    <el-tab-pane v-if="isAdmin" label="Approved Requests" name="approved">
-      <div class="toolbar">
-        <h3>Approved Material Requests</h3>
-        <el-button :loading="loadingApproved" @click="loadApprovedRequests">Refresh</el-button>
-      </div>
+        <div class="accessible-table-container" tabindex="0" role="region" aria-label="Approved Material Requests Table">
+          <el-table v-loading="loadingApproved" :data="approvedRequests" stripe border>
+            <el-table-column prop="id" label="MR ID" width="90" />
+            <el-table-column prop="requesterName" label="Requester" min-width="160" />
+            <el-table-column prop="justification" label="Justification" min-width="220" show-overflow-tooltip />
+            <el-table-column label="Requested On" width="180">
+              <template #default="{ row }">{{ formatDate(row.requestDate) }}</template>
+            </el-table-column>
+            <el-table-column label="Actions" width="200" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  type="primary"
+                  size="small"
+                  :aria-label="`Generate Purchase Order for material request #${row.id}`"
+                  @click="openPoDialog(row)"
+                >
+                  Generate PO
+                </el-button>
+              </template>
+            </el-table-column>
+            <template #empty>
+              <el-empty description="No approved requests" />
+            </template>
+          </el-table>
+        </div>
+      </el-tab-pane>
+    </el-tabs>
 
-      <el-table v-loading="loadingApproved" :data="approvedRequests" stripe border>
-        <el-table-column prop="id" label="MR ID" width="90" />
-        <el-table-column prop="requesterName" label="Requester" min-width="160" />
-        <el-table-column prop="justification" label="Justification" min-width="220" show-overflow-tooltip />
-        <el-table-column label="Requested On" width="180">
-          <template #default="{ row }">{{ formatDate(row.requestDate) }}</template>
-        </el-table-column>
-        <el-table-column label="Actions" width="200" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" size="small" @click="openPoDialog(row)">Generate PO</el-button>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <el-empty description="No approved requests" />
-        </template>
-      </el-table>
-    </el-tab-pane>
-  </el-tabs>
+    <el-dialog v-model="rejectDialogVisible" title="Reject Material Request" width="420px" aria-modal="true">
+      <el-form ref="rejectFormRef" :model="rejectForm" :rules="rejectRules" label-position="top">
+        <el-form-item label="Rejection Note" prop="note">
+          <el-input
+            v-model="rejectForm.note"
+            type="textarea"
+            :rows="3"
+            placeholder="Explain why this request is rejected"
+            aria-label="Rejection note explanation"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="rejectDialogVisible = false">Cancel</el-button>
+        <el-button type="danger" :loading="rejecting" :disabled="rejecting" @click="submitReject">Reject</el-button>
+      </template>
+    </el-dialog>
 
-  <el-dialog v-model="rejectDialogVisible" title="Reject Material Request" width="420px">
-    <el-form ref="rejectFormRef" :model="rejectForm" :rules="rejectRules" label-position="top">
-      <el-form-item label="Rejection Note" prop="note">
-        <el-input
-          v-model="rejectForm.note"
-          type="textarea"
-          :rows="3"
-          placeholder="Explain why this request is rejected"
-        />
-      </el-form-item>
-    </el-form>
-    <template #footer>
-      <el-button @click="rejectDialogVisible = false">Cancel</el-button>
-      <el-button type="danger" :loading="rejecting" :disabled="rejecting" @click="submitReject">Reject</el-button>
-    </template>
-  </el-dialog>
-
-  <el-dialog v-model="poDialogVisible" title="Generate Purchase Order" width="420px">
-    <el-form ref="poFormRef" :model="poForm" :rules="poRules" label-position="top">
-      <el-form-item label="Supplier Name" prop="supplierName">
-        <el-input v-model="poForm.supplierName" placeholder="Supplier name" />
-      </el-form-item>
-      <el-form-item label="Expected Delivery Date">
-        <el-date-picker
-          v-model="poForm.expectedDeliveryDate"
-          type="datetime"
-          value-format="YYYY-MM-DDTHH:mm:ss"
-          style="width: 100%"
-        />
-      </el-form-item>
-    </el-form>
-    <template #footer>
-      <el-button @click="poDialogVisible = false">Cancel</el-button>
-      <el-button type="primary" :loading="generating" :disabled="generating" @click="submitGeneratePo">Generate</el-button>
-    </template>
-  </el-dialog>
+    <el-dialog v-model="poDialogVisible" title="Generate Purchase Order" width="420px" aria-modal="true">
+      <el-form ref="poFormRef" :model="poForm" :rules="poRules" label-position="top">
+        <el-form-item label="Supplier Name" prop="supplierName">
+          <el-input v-model="poForm.supplierName" placeholder="Supplier name" aria-label="Supplier Name" />
+        </el-form-item>
+        <el-form-item label="Expected Delivery Date">
+          <el-date-picker
+            v-model="poForm.expectedDeliveryDate"
+            type="datetime"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            aria-label="Expected Delivery Date"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="poDialogVisible = false">Cancel</el-button>
+        <el-button type="primary" :loading="generating" :disabled="generating" @click="submitGeneratePo">Generate</el-button>
+      </template>
+    </el-dialog>
+  </div>
 </template>
 
 <style scoped>
